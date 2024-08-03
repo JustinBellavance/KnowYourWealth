@@ -6,14 +6,17 @@ Only tested with python 3.12.4 and node 10.4.0
 
 ## To install
 
-Assuming you have a correct python version:
+Assuming you have a correct versions:
+
+For backend:
 
 `cd backend`
 
 `python -m venv .venv && source .venv/bin/activate`
 
-`pip install requirements.txt`
+`pip install -r requirements.txt`
 
+For frontend:
 
 `cd frontend`
 
