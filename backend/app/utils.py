@@ -1,5 +1,5 @@
 from instance import config
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy import create_engine, text
 from datetime import datetime, timedelta
 from dateutil.rrule import rrule, DAILY
@@ -7,13 +7,12 @@ from dateutil.rrule import rrule, DAILY
 from .yfinance_utils import getDailyValue
 
 engine = create_engine(config.SQLALCHEMY_DATABASE_URI)
-Session = sessionmaker(bind=engine)
-session = Session()
+Session = scoped_session(sessionmaker(bind=engine))
 
 def getPortfolioHistoricalData(portfolioid: int, present_date: datetime) -> dict:
     
-    # TODO: add cash, debt and real estate transactions
-    
+    session = Session()
+
     sql_query = text(f"""
     SELECT DISTINCT(ticker) FROM stock_holdings
     WHERE stock_holdings.portfolio_id = :portfolioid
@@ -80,7 +79,8 @@ def getPortfolioHistoricalData(portfolioid: int, present_date: datetime) -> dict
     real_estate_historical_daily_data = getDailyValueRealEstate(real_estate_transactions, present_date.date())
         
     allHistoricalData['real_estate'] = real_estate_historical_daily_data
-    
+
+    session.close() 
     return allHistoricalData
 
 def getDailyValueRealEstate(real_estate_transactions:list[tuple], until_date) -> dict:
@@ -218,8 +218,8 @@ def calculateAccruedInterestDebt(debt_transactions:list[tuple], until_date) -> d
     
     return transactions_daily_historical_data
 
-def getStockFromPortfolio(portfolioid: int) -> list[dict]:
-    
+def getStockFromPortfolio(session, portfolioid: int) -> list[dict]:
+   
     sql_query = text(f"""
     WITH adjusted_amount AS (
         SELECT 
@@ -246,10 +246,10 @@ def getStockFromPortfolio(portfolioid: int) -> list[dict]:
         {'ticker': row.ticker, 'amount': row.amount, 'price': row.price}
         for row in stock_holding_rows
     ]
-    
+ 
     return stocks
 
-def getRealEstateFromPortfolio(portfolioid: int) -> list[dict]:
+def getRealEstateFromPortfolio(session,portfolioid: int) -> list[dict]:
     
     sql_query = text("""
                      WITH adjusted_worth AS (
@@ -276,7 +276,7 @@ def getRealEstateFromPortfolio(portfolioid: int) -> list[dict]:
     
     return real_estate
 
-def getCashFromPortfolio(portfolioid: int) -> list[dict]:
+def getCashFromPortfolio(session,portfolioid: int) -> list[dict]:
     
     # calculate the net cash amount for every name
     sql_query = text(f"""
@@ -304,7 +304,7 @@ def getCashFromPortfolio(portfolioid: int) -> list[dict]:
     
     return cash
 
-def getDebtFromPortfolio(portfolioid: int) -> list[dict]:
+def getDebtFromPortfolio(session, portfolioid: int) -> list[dict]:
     sql_query = text(f"""
                      WITH adjusted_debt AS (
                         SELECT name, interest,
@@ -329,19 +329,22 @@ def getDebtFromPortfolio(portfolioid: int) -> list[dict]:
     
     return debt
 
-def getPortfolioInformation(portfolioid: int) -> dict:
+def getPortfolioInformation(session, portfolioid: int) -> dict:
+    
     sql_query = text(f"SELECT name FROM portfolio WHERE portfolio_id = :portfolioid")
     result = session.execute(sql_query, {'portfolioid': portfolioid})
     portfolio_name = result.fetchone()
-    
     return portfolio_name[0]
     
 # TODO: add error handling
 def getAllHoldingsFromPortfolio(portfolioid: int) -> dict[str, list]:
+
+    session = Session()
     holdings = {}
-    holdings['name'] = getPortfolioInformation(portfolioid)
-    holdings['stocks'] = getStockFromPortfolio(portfolioid)
-    holdings['real_estate'] = getRealEstateFromPortfolio(portfolioid)
-    holdings['cash'] = getCashFromPortfolio(portfolioid)
-    holdings['debt'] = getDebtFromPortfolio(portfolioid)
+    holdings['name'] = getPortfolioInformation(session, portfolioid)
+    holdings['stocks'] = getStockFromPortfolio(session, portfolioid)
+    holdings['real_estate'] = getRealEstateFromPortfolio(session, portfolioid)
+    holdings['cash'] = getCashFromPortfolio(session, portfolioid)
+    holdings['debt'] = getDebtFromPortfolio(session, portfolioid)
+    session.close()
     return holdings
