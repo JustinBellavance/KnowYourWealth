@@ -1,0 +1,51 @@
+# Python
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+instance/
+.env
+*.sqlite3
+*.db
+*.log
+*.bak
+*.swp
+
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Pytest
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.hypothesis/
+
+# VS Code (Editor)
+.vscode/
+
+# Node.js / NPM / Yarn
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+dist/
+build/
+
+# Vue.js (Frontend)
+*.local
+*.env
+*.env.local
+*.env.*.local
+
+# Docker
+docker-compose.override.yml
+.docker/
+
+# Logs
+*.log

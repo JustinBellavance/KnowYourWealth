@@ -1,87 +1,12 @@
 from instance import config
-from sqlalchemy.orm import sessionmaker, scoped_session
-from sqlalchemy import create_engine, text
+from sqlmodel import SQLModel, Field, create_engine, Session
+from sqlalchemy import text
 from datetime import datetime, timedelta
 from dateutil.rrule import rrule, DAILY
-
 from .yfinance_utils import getDailyValue
 
-engine = create_engine(config.SQLALCHEMY_DATABASE_URI)
-Session = scoped_session(sessionmaker(bind=engine))
-
-def getPortfolioHistoricalData(portfolioid: int, present_date: datetime) -> dict:
-    
-    session = Session()
-
-    sql_query = text(f"""
-    SELECT DISTINCT(ticker) FROM stock_holdings
-    WHERE stock_holdings.portfolio_id = :portfolioid
-    ORDER BY date ASC
-    """)
-    
-    result = session.execute(sql_query, {'portfolioid': portfolioid})
-    unique_tickers_list = result.fetchall()
-    
-    sql_query = text(f"""
-    SELECT action, DATE(date), amount, price FROM stock_holdings
-    WHERE ticker = :ticker
-    ORDER BY date ASC
-    """)
-    
-    allHistoricalData = {}
-  
-    # for all stock tickers, get a running tally of when they were bought and sold and for what price,  
-    stocks_historical_daily_data = {}
-    for ticker in unique_tickers_list:
-        ticker = ticker[0]
-        ticker_transactions = session.execute(sql_query, {'ticker': ticker}).fetchall()
-        
-        ticker_daily_value = getDailyValue(ticker, ticker_transactions, present_date.date())
-        
-        stocks_historical_daily_data[ticker] = ticker_daily_value
-        
-    allHistoricalData['stocks'] = stocks_historical_daily_data
-    
-    sql_query = text(f"""
-        SELECT name, amount, interest, date, action FROM cash
-        WHERE portfolio_id = :portfolioid
-        ORDER BY date ASC
-                     """)
-    
-    cash_transactions = session.execute(sql_query, {'portfolioid': portfolioid}).fetchall()
-    
-    cash_historical_daily_data = calculateAccruedInterestCash(cash_transactions, present_date.date())
-    
-    allHistoricalData['cash'] = cash_historical_daily_data
-    
-    sql_query = text(f"""
-        SELECT name, amount, interest, date, action FROM debt
-        WHERE portfolio_id = :portfolioid
-        ORDER BY date ASC
-                     """)
-    
-    debt_transactions = session.execute(sql_query, {'portfolioid': portfolioid}).fetchall()
-    
-    debt_historical_daily_data = calculateAccruedInterestDebt(debt_transactions, present_date.date())
-    
-    allHistoricalData['debt'] = debt_historical_daily_data
-    
-    # add real estate data
-    
-    sql_query = text(f"""
-        SELECT name, worth, date, action FROM real_estate
-        WHERE portfolio_id = :portfolioid
-        ORDER BY date ASC
-                     """)
-    
-    real_estate_transactions = session.execute(sql_query, {'portfolioid' : portfolioid}).fetchall()
-    
-    real_estate_historical_daily_data = getDailyValueRealEstate(real_estate_transactions, present_date.date())
-        
-    allHistoricalData['real_estate'] = real_estate_historical_daily_data
-
-    session.close() 
-    return allHistoricalData
+# SQLModel engine setup
+engine = create_engine(config.DATABASE_URL)
 
 def getDailyValueRealEstate(real_estate_transactions:list[tuple], until_date) -> dict:
     
@@ -218,133 +143,167 @@ def calculateAccruedInterestDebt(debt_transactions:list[tuple], until_date) -> d
     
     return transactions_daily_historical_data
 
+# Function to fetch historical data
+def getPortfolioHistoricalData(portfolioid: int, present_date: datetime) -> dict:
+    with Session(engine) as session:
+        allHistoricalData = {}
+
+        # Fetch unique tickers
+        unique_tickers_list = session.exec(text(
+            f"SELECT DISTINCT(ticker) FROM stock_holdings WHERE portfolio_id = {portfolioid} ORDER BY date ASC"
+        )).all()
+
+        stocks_historical_daily_data = {}
+        for ticker in unique_tickers_list:
+            ticker_transactions = session.exec(text(
+                f"SELECT action, DATE(date), amount, price FROM stock_holdings WHERE ticker = '{ticker}' ORDER BY date ASC"
+            )).all()
+            ticker_daily_value = getDailyValue(ticker, ticker_transactions, present_date.date())
+            stocks_historical_daily_data[ticker] = ticker_daily_value
+        
+        allHistoricalData['stocks'] = stocks_historical_daily_data
+
+        # Fetch and process cash data
+        cash_transactions = session.exec(text(
+            f"SELECT name, amount, interest, date, action FROM cash WHERE portfolio_id = {portfolioid} ORDER BY date ASC"
+        )).all()
+
+        cash_historical_daily_data = calculateAccruedInterestCash(cash_transactions, present_date.date())
+        allHistoricalData['cash'] = cash_historical_daily_data
+
+        # Fetch and process debt data
+        debt_transactions = session.exec(text(
+            f"SELECT name, amount, interest, date, action FROM debt WHERE portfolio_id = {portfolioid} ORDER BY date ASC"
+        )).all()
+
+        debt_historical_daily_data = calculateAccruedInterestDebt(debt_transactions, present_date.date())
+        allHistoricalData['debt'] = debt_historical_daily_data
+
+        # Fetch and process real estate data
+        real_estate_transactions = session.exec(text(
+            f"SELECT name, worth, date, action FROM real_estate WHERE portfolio_id = {portfolioid} ORDER BY date ASC"
+        )).all()
+
+        real_estate_historical_daily_data = getDailyValueRealEstate(real_estate_transactions, present_date.date())
+        allHistoricalData['real_estate'] = real_estate_historical_daily_data
+
+    return allHistoricalData
+
 def getStockFromPortfolio(session, portfolioid: int) -> list[dict]:
-   
-    sql_query = text(f"""
-    WITH adjusted_amount AS (
-        SELECT 
-            ticker, price,
+    result = session.exec(text(
+        f"""
+        WITH adjusted_amount AS (
+            SELECT ticker, price,
             CASE
                 WHEN action = 'remove' THEN -amount
                 ELSE amount
             END AS adj_amount
-        FROM stock_holdings
-        WHERE portfolio_id = :portfolioid
-    ), grouped_stocks AS (
-        SELECT ticker, SUM(adj_amount) AS amount, price
-        FROM adjusted_amount
-        GROUP BY ticker, price
-    )
-    SELECT ROW_NUMBER() OVER (ORDER BY ticker) AS id, ticker, amount, price
-    FROM grouped_stocks;
-    """)
-    
-    result = session.execute(sql_query, {'portfolioid': portfolioid})
-    stock_holding_rows = result.fetchall()
-    
+            FROM stock_holdings
+            WHERE portfolio_id = {portfolioid}
+        ), grouped_stocks AS (
+            SELECT ticker, SUM(adj_amount) AS amount, price
+            FROM adjusted_amount
+            GROUP BY ticker, price
+        )
+        SELECT ROW_NUMBER() OVER (ORDER BY ticker) AS id, ticker, amount, price
+        FROM grouped_stocks
+        """
+    )).all()
+
     stocks = [
         {'ticker': row.ticker, 'amount': row.amount, 'price': row.price}
-        for row in stock_holding_rows
+        for row in result
     ]
- 
+
     return stocks
 
-def getRealEstateFromPortfolio(session,portfolioid: int) -> list[dict]:
-    
-    sql_query = text("""
-                     WITH adjusted_worth AS (
-                        SELECT name,
-                            CASE
-                                WHEN action = 'remove' THEN -worth
-                                ELSE worth
-                            END AS worth
-                        FROM real_estate
-                        WHERE portfolio_id = :portfolioid
-                     )
-                     SELECT name, sum(worth) AS worth
-                     FROM adjusted_worth
-                     GROUP BY name;
-                     """)
-    
-    result = session.execute(sql_query, {'portfolioid': portfolioid})  
-    real_estate_rows = result.fetchall()
-    
+def getRealEstateFromPortfolio(session, portfolioid: int) -> list[dict]:
+    result = session.exec(text(
+        """
+        WITH adjusted_worth AS (
+            SELECT name,
+            CASE
+                WHEN action = 'remove' THEN -worth
+                ELSE worth
+            END AS worth
+            FROM real_estate
+            WHERE portfolio_id = :portfolioid
+        )
+        SELECT name, sum(worth) AS worth
+        FROM adjusted_worth
+        GROUP BY name
+        """
+    ), params={"portfolioid": portfolioid}).all()
+
     real_estate = [
         {'name': row.name, 'worth': row.worth}
-        for row in real_estate_rows
+        for row in result
     ]
-    
+
     return real_estate
 
-def getCashFromPortfolio(session,portfolioid: int) -> list[dict]:
-    
-    # calculate the net cash amount for every name
-    sql_query = text(f"""
-                     WITH adjusted_cash AS (
-                        SELECT name, interest,
-                            CASE
-                                WHEN action = 'remove' THEN -amount
-                                ELSE amount
-                            END AS adjusted_amount
-                        FROM cash
-                        WHERE portfolio_id = :portfolioid
-                    )
-                    SELECT name, SUM(adjusted_amount) AS amount, interest 
-                    FROM adjusted_cash
-                    GROUP BY name, interest;
-                    """)
-    
-    result = session.execute(sql_query, {'portfolioid': portfolioid})   
-    cash_rows = result.fetchall()
-    
+def getCashFromPortfolio(session, portfolioid: int) -> list[dict]:
+    result = session.exec(text(
+        f"""
+        WITH adjusted_cash AS (
+            SELECT name, interest,
+            CASE
+                WHEN action = 'remove' THEN -amount
+                ELSE amount
+            END AS adjusted_amount
+            FROM cash
+            WHERE portfolio_id = {portfolioid}
+        )
+        SELECT name, SUM(adjusted_amount) AS amount, interest
+        FROM adjusted_cash
+        GROUP BY name, interest
+        """
+    )).all()
+
     cash = [
         {'name': row.name, 'amount': row.amount, 'interest': row.interest}
-        for row in cash_rows
+        for row in result
     ]
-    
+
     return cash
 
 def getDebtFromPortfolio(session, portfolioid: int) -> list[dict]:
-    sql_query = text(f"""
-                     WITH adjusted_debt AS (
-                        SELECT name, interest,
-                            CASE
-                                WHEN action = 'remove' THEN -amount
-                                ELSE amount
-                            END AS adjusted_amount
-                        FROM debt
-                        WHERE portfolio_id = :portfolioid
-                    )
-                    SELECT name, SUM(adjusted_amount) AS amount, interest 
-                    FROM adjusted_debt
-                    GROUP BY name, interest;
-                    """)    
-    result = session.execute(sql_query, {'portfolioid': portfolioid})
-    debt_rows = result.fetchall()
+    result = session.exec(text(
+        f"""
+        WITH adjusted_debt AS (
+            SELECT name, interest,
+            CASE
+                WHEN action = 'remove' THEN -amount
+                ELSE amount
+            END AS adjusted_amount
+            FROM debt
+            WHERE portfolio_id = {portfolioid}
+        )
+        SELECT name, SUM(adjusted_amount) AS amount, interest
+        FROM adjusted_debt
+        GROUP BY name, interest
+        """
+    )).all()
 
     debt = [
         {'name': row.name, 'amount': row.amount, 'interest': row.interest}
-        for row in debt_rows
+        for row in result
     ]
-    
+
     return debt
 
 def getPortfolioInformation(session, portfolioid: int) -> dict:
-    
-    sql_query = text(f"SELECT name FROM portfolio WHERE portfolio_id = :portfolioid")
-    result = session.execute(sql_query, {'portfolioid': portfolioid})
-    portfolio_name = result.fetchone()
-    return portfolio_name[0]
-    
-# TODO: add error handling
-def getAllHoldingsFromPortfolio(portfolioid: int) -> dict[str, list]:
+    statement = text("SELECT name FROM portfolio WHERE portfolio_id = :portfolioid")
+    result = session.exec(statement, params={"portfolioid": portfolioid}).first()
+    return result.name if result else None
 
-    session = Session()
-    holdings = {}
-    holdings['name'] = getPortfolioInformation(session, portfolioid)
-    holdings['stocks'] = getStockFromPortfolio(session, portfolioid)
-    holdings['real_estate'] = getRealEstateFromPortfolio(session, portfolioid)
-    holdings['cash'] = getCashFromPortfolio(session, portfolioid)
-    holdings['debt'] = getDebtFromPortfolio(session, portfolioid)
-    session.close()
+def getAllHoldingsFromPortfolio(portfolioid: int) -> dict[str, list]:
+    with Session(engine) as session:
+        holdings = {}
+        holdings['name'] = getPortfolioInformation(session, portfolioid)
+        holdings['stocks'] = getStockFromPortfolio(session, portfolioid)
+        holdings['real_estate'] = getRealEstateFromPortfolio(session, portfolioid)
+        holdings['cash'] = getCashFromPortfolio(session, portfolioid)
+        holdings['debt'] = getDebtFromPortfolio(session, portfolioid)
+    
     return holdings

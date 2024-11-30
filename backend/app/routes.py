@@ -1,192 +1,166 @@
-from flask import request, jsonify, current_app as app
-from app import db
-from werkzeug.security import generate_password_hash, check_password_hash
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi.security import OAuth2PasswordBearer
+import os
+import jwt
 from app.models import Users, Portfolio, StockHoldings, Cash, Debt, RealEstate
 from app.utils import getAllHoldingsFromPortfolio, getPortfolioHistoricalData
 from app.yfinance_utils import stockIsInYF
-from datetime import datetime
+from datetime import datetime, timedelta
+from instance.config import db
 
-jwt = JWTManager(app)
+from dotenv import load_dotenv
 
-@app.route('/login', methods=['POST'])
-def login():
+load_dotenv()
 
-    data = request.get_json()
+SECRET_KEY = os.getenv('SECRET_KEY')
+ALGORITHM = os.getenv('SECRET_KEY')
+
+# OAuth2 scheme for token authentication
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+# Create a FastAPI app instance
+app = FastAPI()
+
+# JWT Authentication Helper Functions
+def create_access_token(data: dict, expires_delta: timedelta = timedelta(hours=1)):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + expires_delta
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def verify_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except jwt.PyJWTError:
+        return None
+
+# FastAPI Routes
+@app.post("/login")
+async def login(request: Request):
+    data = await request.json()
     username = data['username']
     password = data['password']
     
     user = Users.query.filter_by(username=username).first()
     
-    if not user or not check_password_hash(user.password, password):
-        return jsonify({"message": "Bad username or password. Try again."}), 401
+    if not user or user.password != password:
+        raise HTTPException(status_code=400, detail="Bad username or password")
     
-    access_token = create_access_token(identity={'user_id': user.user_id, 'username': user.username})
-    return jsonify(access_token=access_token), 200
+    access_token = create_access_token({"user_id": user.user_id, "username": user.username})
+    return {"access_token": access_token}
 
-@app.route('/protected', methods=['GET'])
-@jwt_required()
-def protected():
-    print('protected route')
-    current_user = get_jwt_identity()
-    return jsonify(logged_in_as=current_user), 200
+@app.get("/protected")
+async def protected(token: str = Depends(oauth2_scheme)):
+    current_user = verify_token(token)
+    if current_user is None:
+        raise HTTPException(status_code=401, detail="Invalid token or expired")
+    return current_user
 
-@app.route('/register', methods=['POST'])
-def register():
-    print('register route')
+@app.post("/register")
+async def register(request: Request):
+    data = await request.json()
+    username = data['username']
+    password = data['password']
+    firstname = data['firstname']
+    lastname = data['lastname']
+    email = data['email']
+    country = data['country']
+
+    # Check if user already exists
+    if Users.query.filter_by(username=username).first():
+        raise HTTPException(status_code=400, detail="User already exists")
     
-    data = request.json
-    hashed_password = generate_password_hash(data['password'], method='pbkdf2:sha256')
-    
-    #check if users exists already
-    if Users.query.filter_by(username=data['username']).first():
-        return jsonify({'message': 'User already exists'}), 409
-    
-    if data['country'].lower() == "canada":
-        country_id = 1
-    else:
-        country_id = 2
-        
+    country_id = 1 if country.lower() == "canada" else 2
+
     new_user = Users(
-        username=data['username'],
-        password=hashed_password,
-        firstname=data['firstname'],
-        lastname=data['lastname'],
-        email=data['email'],
+        username=username,
+        password=password,  # Password should be hashed in production
+        firstname=firstname,
+        lastname=lastname,
+        email=email,
         country_id=country_id
     )
+
     db.session.add(new_user)
     db.session.commit()
+
+    access_token = create_access_token({"username": username})
+    return {"access_token": access_token}
+
+@app.delete("/delete_user")
+async def delete_user(request: Request):
+    data = await request.json()
+    user_to_delete = Users.query.filter_by(user_id=data['user_id'], password=data['password']).first()
     
-    access_token = create_access_token(identity={'username': data['username']})
-
-    return jsonify(access_token=access_token)
-
-@app.route('/delete_user', methods=['DELETE'])
-def delete():
-    data = request.json
-    user_to_delete = Users.query.filter_by(user_id=data['user_id'],password=data['formData']['password']).first()
-
+    if not user_to_delete:
+        raise HTTPException(status_code=404, detail="User not found")
+    
     db.session.delete(user_to_delete)
     db.session.commit()
-    return jsonify({"message": "User deleted successfully!"}), 200
+    return {"message": "User deleted successfully!"}
 
-@app.route('/add_portfolio', methods=['POST'])
-def add_portfolio():
-
-    data = request.get_json()
-    
-    # print(data)
-
-    new_portfolio = Portfolio(
-        user_id=data['user_id'],
-        name=data['formData']['portfolio_name']
-    )
-    
+@app.post("/add_portfolio")
+async def add_portfolio(request: Request):
+    data = await request.json()
+    new_portfolio = Portfolio(user_id=data['user_id'], name=data['portfolio_name'])
     db.session.add(new_portfolio)
     db.session.commit()
+    return {"message": "Portfolio created successfully"}
 
-    return jsonify({'message': 'Portfolio created successfully'}), 201
-
-@app.route('/portfolios/<id>', methods=['GET'])
-def portfolios(id):
-
-    # need to use user_id instead of username
+@app.get("/portfolios/{id}")
+async def get_portfolios(id: int):
     portfolios = Portfolio.query.filter_by(user_id=id).all()
-    
-    if portfolios == []:
-        return jsonify({'message': 'No portfolios found'}), 404
-    
-    if portfolios:
-        portfolios = [portfolio.to_dict() for portfolio in portfolios]
+    if not portfolios:
+        raise HTTPException(status_code=404, detail="No portfolios found")
+    return {"portfolios": [portfolio.to_dict() for portfolio in portfolios]}
 
-    return jsonify({'portfolios': portfolios}), 201
-
-
-@app.route('/portfolio/<id>', methods=['GET'])
-def get_portfolios(id):
-    
-    # TODO: check if portfolio exists in database
-    
+@app.get("/portfolio/{id}")
+async def get_portfolio(id: int):
     portfolio_holdings = getAllHoldingsFromPortfolio(id)
-    
     if not portfolio_holdings:
-        return jsonify({'message': 'Portfolio information not found'}), 404
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+    return {"portfolio": portfolio_holdings}
 
-    return jsonify({'portfolio': portfolio_holdings}), 201
-
-@app.route('/chart_data/<portfolio_id>', methods=['GET'])
-def get_chart_data(portfolio_id):
-    # TODO: check if portfolio exists in database
-    
-    # get current date and time of the request
-    # TODO: adapt to timezone of user, maybe.
+@app.get("/chart_data/{portfolio_id}")
+async def get_chart_data(portfolio_id: int):
     current_datetime = datetime.now()
-    
     portfolio_historical_data = getPortfolioHistoricalData(portfolio_id, current_datetime)
-        
     if not portfolio_historical_data:
-        return jsonify({'message': "Couldn't retrieve historical data"}), 400
-    
-    return jsonify({'historical_data': portfolio_historical_data}), 201
+        raise HTTPException(status_code=404, detail="Couldn't retrieve historical data")
+    return {"historical_data": portfolio_historical_data}
 
-# add stocks to stock holdings
-@app.route('/stocks/<portfolio_id>', methods=['POST'])
-def stocks(portfolio_id):
-    
-    data = request.json
-    # print(f"data: {data}")
-    
-    portfolio_id = portfolio_id
+@app.post("/stocks/{portfolio_id}")
+async def add_stock(portfolio_id: int, request: Request):
+    data = await request.json()
     ticker = data['ticker']
-    average_price = data['price']
-    number_shares = data['quantity']
+    price = data['price']
+    quantity = data['quantity']
     action = 'add'
-    
-    if "fees" in data:
-        fees = data['fees']
-    else:
-        fees = None
-        
-    if stockIsInYF(ticker) == False:
-        return jsonify({'message': 'Stock not found in Yahoo Finance'}), 404
 
-    new_holding = StockHoldings(
-        portfolio_id=portfolio_id,
-        ticker=ticker,
-        price=average_price,
-        amount=number_shares,
-        fees=fees,
-        action=action
-    )
+    if not stockIsInYF(ticker):
+        raise HTTPException(status_code=404, detail="Stock not found in Yahoo Finance")
+    
+    new_holding = StockHoldings(portfolio_id=portfolio_id, ticker=ticker, price=price, amount=quantity, action=action)
+    db.session.add(new_holding)
+    db.session.commit()
+    return {"message": "Stock added successfully!"}
 
-    # add stocks to stock holdings
-    # add to stock_data table and stock_holdings table for the current date
-    if (new_holding):
-        db.session.add(new_holding)
-        db.session.commit()
-        return jsonify({'message': 'Stock added successfully!'}), 201
-    
-    return jsonify({'message': 'Stock not added'}), 400
+@app.post('/remove_stocks/{id}')
+async def remove_stocks(id: int, request: Request):
+    data = await request.json()
 
-# removee stocks from stock belonging to portfolio id
-@app.route('/remove_stocks/<id>', methods=['POST'])
-def remove_stocks(id):
-    
-    data = request.json
-    # print(f"data: {data}")
-    
     portfolio_id = id
-    ticker = data['ticker']
-    average_price = data['price']
-    number_shares = data['quantity']
+    ticker = data.get('ticker')
+    average_price = data.get('price')
+    number_shares = data.get('quantity')
     action = 'remove'
-    
-    if "fees" in data:
-        fees = data['fees']
-    else:
-        fees = None
 
+    fees = data.get('fees', None)
+
+    if not ticker or not average_price or not number_shares:
+        raise HTTPException(status_code=400, detail="Missing required fields")
 
     new_holding = StockHoldings(
         portfolio_id=portfolio_id,
@@ -197,24 +171,22 @@ def remove_stocks(id):
         action=action
     )
 
-    if (new_holding):
-        db.session.add(new_holding)
-        db.session.commit()
-        return jsonify({'message': 'Stock sold successfully!'}), 201
-    
-    return jsonify({'message': 'Stock not sold'}), 400
+    db.session.add(new_holding)
+    db.session.commit()
+    return {'message': 'Stock sold successfully!'}
 
-@app.route('/cash/<id>', methods=['POST'])
-def cash(id):
-    
-    data = request.json
-    # print(f"data: {data}")
-    
+@app.post('/cash/{id}')
+async def add_cash(id: int, request: Request):
+    data = await request.json()
+
     portfolio_id = id
-    name = data['name']
-    amount = data['amount']
-    interest = data['interest']
+    name = data.get('name')
+    amount = data.get('amount')
+    interest = data.get('interest')
     action = 'add'
+
+    if not name or not amount:
+        raise HTTPException(status_code=400, detail="Missing required fields")
 
     new_cash = Cash(
         portfolio_id=portfolio_id,
@@ -224,24 +196,22 @@ def cash(id):
         action=action
     )
 
-    if (new_cash):
-        db.session.add(new_cash)
-        db.session.commit()
-        return jsonify({'message': 'Cash added successfully!'}), 201
-    
-    return jsonify({'message': 'Cash not added'}), 400
+    db.session.add(new_cash)
+    db.session.commit()
+    return {'message': 'Cash added successfully!'}
 
-@app.route('/remove_cash/<id>', methods=['POST'])
-def remove_cash(id):
-    
-    data = request.json
-    # print(f"data: {data}")
-    
+@app.post('/remove_cash/{id}')
+async def remove_cash(id: int, request: Request):
+    data = await request.json()
+
     portfolio_id = id
-    name = data['name']
-    amount = data['amount']
-    interest = data['interest']
+    name = data.get('name')
+    amount = data.get('amount')
+    interest = data.get('interest')
     action = 'remove'
+
+    if not name or not amount:
+        raise HTTPException(status_code=400, detail="Missing required fields")
 
     remove_cash = Cash(
         portfolio_id=portfolio_id,
@@ -251,23 +221,21 @@ def remove_cash(id):
         action=action
     )
 
-    if (remove_cash):
-        db.session.add(remove_cash)
-        db.session.commit()
-        return jsonify({'message': 'Cash removed successfully!'}), 201
-    
-    return jsonify({'message': 'Cash not removed'}), 400
+    db.session.add(remove_cash)
+    db.session.commit()
+    return {'message': 'Cash removed successfully!'}
 
-@app.route('/real_estate/<id>', methods=['POST'])
-def real_estate(id):
-    
-    data = request.json
-    # print(f"data: {data}")
-    
+@app.post('/real_estate/{id}')
+async def add_real_estate(id: int, request: Request):
+    data = await request.json()
+
     portfolio_id = id
-    name = data['name']
-    worth = data['worth']
+    name = data.get('name')
+    worth = data.get('worth')
     action = 'add'
+
+    if not name or not worth:
+        raise HTTPException(status_code=400, detail="Missing required fields")
 
     new_real_estate = RealEstate(
         portfolio_id=portfolio_id,
@@ -276,23 +244,21 @@ def real_estate(id):
         action=action
     )
 
-    if (new_real_estate):
-        db.session.add(new_real_estate)
-        db.session.commit()
-        return jsonify({'message': 'Real estate added successfully!'}), 201
-    
-    return jsonify({'message': 'Real estate not added'}), 400
+    db.session.add(new_real_estate)
+    db.session.commit()
+    return {'message': 'Real estate added successfully!'}
 
-@app.route('/remove_real_estate/<id>', methods=['POST'])
-def remove_real_estate(id):
-    
-    data = request.json
-    # print(f"data: {data}")
-    
+@app.post('/remove_real_estate/{id}')
+async def remove_real_estate(id: int, request: Request):
+    data = await request.json()
+
     portfolio_id = id
-    name = data['name']
-    worth = data['worth']
+    name = data.get('name')
+    worth = data.get('worth')
     action = 'remove'
+
+    if not name or not worth:
+        raise HTTPException(status_code=400, detail="Missing required fields")
 
     remove_real_estate = RealEstate(
         portfolio_id=portfolio_id,
@@ -301,25 +267,23 @@ def remove_real_estate(id):
         action=action
     )
 
-    if (remove_real_estate):
-        db.session.add(remove_real_estate)
-        db.session.commit()
-        return jsonify({'message': 'Real estate removed successfully!'}), 201
-    
-    return jsonify({'message': 'Real estate not removed'}), 400
+    db.session.add(remove_real_estate)
+    db.session.commit()
+    return {'message': 'Real estate removed successfully!'}
 
-@app.route('/debt/<id>', methods=['POST'])
-def debt(id):
-    
-    data = request.json
-    # print(f"data: {data}")
-    
+@app.post('/debt/{id}')
+async def add_debt(id: int, request: Request):
+    data = await request.json()
+
     portfolio_id = id
-    name = data['name']
-    amount = data['amount']
-    interest = data['interest']
+    name = data.get('name')
+    amount = data.get('amount')
+    interest = data.get('interest')
     action = 'add'
 
+    if not name or not amount:
+        raise HTTPException(status_code=400, detail="Missing required fields")
+
     new_debt = Debt(
         portfolio_id=portfolio_id,
         name=name,
@@ -328,25 +292,23 @@ def debt(id):
         action=action
     )
 
-    if (new_debt):
-        db.session.add(new_debt)
-        db.session.commit()
-        return jsonify({'message': 'Debt added successfully!'}), 201
-    
-    return jsonify({'message': 'Debt not added'}), 400
+    db.session.add(new_debt)
+    db.session.commit()
+    return {'message': 'Debt added successfully!'}
 
-@app.route('/remove_debt/<id>', methods=['POST'])
-def remove_debt(id):
-    
-    data = request.json
-    # print(f"data: {data}")
-    
+@app.post('/remove_debt/{id}')
+async def remove_debt(id: int, request: Request):
+    data = await request.json()
+
     portfolio_id = id
-    name = data['name']
-    amount = data['amount']
-    interest = data['interest']
+    name = data.get('name')
+    amount = data.get('amount')
+    interest = data.get('interest')
     action = 'remove'
 
+    if not name or not amount:
+        raise HTTPException(status_code=400, detail="Missing required fields")
+
     new_debt = Debt(
         portfolio_id=portfolio_id,
         name=name,
@@ -355,9 +317,6 @@ def remove_debt(id):
         action=action
     )
 
-    if (new_debt):
-        db.session.add(new_debt)
-        db.session.commit()
-        return jsonify({'message': 'Debt removed successfully!'}), 201
-    
-    return jsonify({'message': 'Debt not removed'}), 400
+    db.session.add(new_debt)
+    db.session.commit()
+    return {'message': 'Debt removed successfully!'}
