@@ -29,7 +29,7 @@
         <label for="date">Date</label>
         <input type="date" id="date" v-model="date" />
       </div>
-      <button @click="submitCash">
+      <button @click="confirmCash">
         {{ isAdding ? 'Submit Add' : 'Submit Remove' }}
       </button>
     </div>
@@ -37,18 +37,30 @@
   
   <script setup lang="ts">
   import { ref } from "vue";
+  import {useRoute} from "vue-router"
+  import axios from "axios"
+
+  const route = useRoute();
+  const portfolioId = route.params.id; // Access the `id` from the URL
   
   const amount = ref<number | null>(null);
   const date = ref<string>(new Date().toISOString().split("T")[0]); // Default to current date
   const isAdding = ref(true); // Tracks whether the action is 'Add' or 'Remove'
+
+  const apiUrl = import.meta.env.VITE_API_URL;
   
   // Function to set the action type (Add or Remove)
   const setAction = (action: "add" | "remove") => {
     isAdding.value = action === "add";
   };
+
+  const clearForm = () => {
+    amount.value = 0;
+    date.value = new Date().toISOString().split("T")[0];
+  };
   
   // Dummy submit function for backend integration
-  const submitCash = () => {
+  const confirmCash = () => {
     if (!amount.value || !date.value) {
       alert("Please fill in all fields.");
       return;
@@ -59,10 +71,34 @@
       amount: amount.value,
       date: date.value,
     };
+
+    const isConfirmed = confirm(`
+        Please confirm the following details:
+        Action: ${cashAction.action.toUpperCase()}
+        Amount: $${cashAction.amount.toFixed(2)}
+        Date: ${cashAction.date}
+    `);
+
+    if (isConfirmed) {
+      console.log("Cash transaction:", cashAction);
+
+      let url = `${apiUrl}/cash/buy/${portfolioId}`;
+
+      if (cashAction.action === 'sell'){
+        url = `${apiUrl}/cash/sell/${portfolioId}`;
+      }
+
+      axios.put(url, cashAction)
+      .then(response => {
+        console.log('Response:', response.data);
+      })
+      .catch(error => {
+        console.error('Error:', error);
+      });
+
+      clearForm();
+    }
   
-    console.log("Cash action submitted:", cashAction);
-    // Here, you would differentiate backend routes based on cashAction.action
-    // e.g., POST to `/cash/add` or `/cash/remove`
   };
   </script>
   

@@ -75,8 +75,6 @@ const isBuying = ref(true); // Tracks whether the action is 'Buy' or 'Sell'
 
 const apiUrl = import.meta.env.VITE_API_URL;
 
-console.log('API URL:', apiUrl);
-
 // Function to set the action type (Buy or Sell)
 const setAction = (action: "buy" | "sell") => {
   isBuying.value = action === "buy";

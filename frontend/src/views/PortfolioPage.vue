@@ -3,8 +3,8 @@
       <div class="sidebar">
         <StockSidebar />
       </div>
-  
-      <main class="content">
+      
+      <main class="content m-3">
         <header class="page-header">
           <div class="tab-buttons">
             <TabButton
@@ -15,31 +15,32 @@
               @activate="setActiveTab"
             />
           </div>
-          <p class="text-6xl font-bold text-black">$50,000</p>
+          <p class="text-6xl font-bold text-black">${{totalNetWorth}}</p>
         </header>
 
         <section class="worth-graph">
             <WorthGraph :data="currentData" :width=1300 :height=500></WorthGraph>
         </section>
   
-        <section class="portfolio-overview">
-          <h2>Overview</h2>
-          <div class="overview-grid">
-            <div class="card" v-for="(item, index) in overviewData" :key="index">
-              <h3>{{ item.title }}</h3>
-              <p>{{ item.value }}</p>
-            </div>
+        <section class="portfolio-overview p-1 m-3">
+          <p class="text-3xl">Overview</p>
+          <div class="overview-grid mt-4 mx-0 px-0">
+            <AssetCard 
+              v-for="(asset, index) in overviewData" 
+              :key="index"
+              :asset="asset"
+            />
           </div>
         </section>
   
-        <section class="recent-transactions">
+        <!-- <section class="recent-transactions">
           <h2>Recent Transactions</h2>
           <ul>
             <li v-for="(transaction, index) in recentTransactions" :key="index">
               <strong>{{ transaction.type }}:</strong> {{ transaction.details }} - {{ transaction.date }}
             </li>
           </ul>
-        </section>
+        </section> -->
       </main>
     </div>
   </template>
@@ -48,13 +49,22 @@
   import StockSidebar from "@/components/StockSidebar.vue";
   import WorthGraph from "@/components/WorthGraph.vue"
   import TabButton from "@/components/TabButton.vue"
+  import AssetCard from "@/components/AssetCard.vue"
 
-  import { ref, computed } from 'vue';
+  import { ref, computed, onMounted } from 'vue';
+  import { useRoute } from 'vue-router';
+  import axios from 'axios';
+
+  const route = useRoute();
+  const portfolioId = route.params.id; // Access the `id` from the URL
+
+  const apiUrl = import.meta.env.VITE_API_URL;
 
   // Define tabs
   const tabs = [
     { label: 'All Assets' },
     { label: 'Stocks' },
+    { label: 'Cash'},
   ];
 
   // Active tab state
@@ -67,38 +77,111 @@
 
   // Computed property for dynamic data
   const currentData = computed(() => {
-    return activeTab.value === 'All Assets' ? dummyData : dummyStockData;
+    if (activeTab.value === "All Assets"){
+      return assets.value;
+    } else if (activeTab.value === "Stocks"){
+      return stocks.value;
+    } else if (activeTab.value === "Cash"){
+      return cash.value;
+    }
   });
   
-  const overviewData = [
-    { title: "Total Net Worth", value: "$50,000" },
-    { title: "Stocks", value: "$30,000" },
-    { title: "Cash", value: "$20,000" },
-  ];
+  // const recentTransactions = [
+  //   { type: "Stock Purchase", details: "Bought 10 shares of AAPL", date: "2024-11-28" },
+  //   { type: "Cash Deposit", details: "Deposited $500", date: "2024-11-27" },
+  // ];
+
+  const assets = ref([]);
+  const stocks = ref([]);
+  const cash = ref([]);
+
+  // Fetch assets on component mount
+  const fetchAssets = async () => {
+    try {
+      const response = await axios.get(`${apiUrl}/assets/${portfolioId}`);
+      console.log("Response:", response.data);
+      assets.value = response.data;
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
+
+  // Computed properties for totals
+  const stocksTotal = computed(() =>
+    stocks.value.reduce((sum, item) => sum + item.value, 0)
+  );
+  const cashTotal = computed(() =>
+    cash.value.reduce((sum, item) => sum + item.value, 0)
+  );
+  const totalNetWorth = computed(() => stocksTotal.value + cashTotal.value);
+
+  const stockDetails = computed(() => {
+  // Group the stocks by their name
+  const groupedByStockName: Record<string, any[]> = {};
+
+  // Step 1: Group by stock name
+  stocks.value.forEach((stock) => {
+    if (!groupedByStockName[stock.name]) {
+      groupedByStockName[stock.name] = [];
+    }
+    groupedByStockName[stock.name].push(stock);
+  });
+
+  // Step 2: For each stock, find the entry with the latest date
+  const latestStockPerName = Object.keys(groupedByStockName).map((name) => {
+    // Get all the stocks for this name and sort them by date
+    const stocksForName = groupedByStockName[name];
+
+    // Sort by date in descending order to get the latest date first
+    stocksForName.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // Return the stock with the most recent date
+    return {
+      name,
+      value: stocksForName[0].value, // Take the value of the most recent stock entry
+      quantity: stocksForName[0].quantity,
+      price: stocksForName[0].price,
+    };
+  });
+
+  return latestStockPerName;
+});
+
+
+  // Overview data for rendering
+  const overviewData = computed(() => [
+    { title: "Stocks", value: `$${stocksTotal.value}`, details : stockDetails.value},
+    //{ title: "Cash", value: `$${cashTotal.value}` },
+  ]);
+
+  // Fetch assets on component mount
+  const fetchStocks = async () => {
+    try {
+      const response = await axios.get(`${apiUrl}/stocks/${portfolioId}`);
+      console.log("Response:", response.data);
+      stocks.value = response.data;
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
   
-  const recentTransactions = [
-    { type: "Stock Purchase", details: "Bought 10 shares of AAPL", date: "2024-11-28" },
-    { type: "Cash Deposit", details: "Deposited $500", date: "2024-11-27" },
-  ];
+    // Fetch assets on component mount
+    const fetchCash = async () => {
+    try {
+      const response = await axios.get(`${apiUrl}/cash/${portfolioId}`);
+      console.log("Response:", response.data);
+      cash.value = response.data;
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
 
-
-  const dummyData = [
-  { date: "2024-01-01", value: 1000, type: "Stocks" },
-  { date: "2024-01-02", value: 1200, type: "Stocks" },
-  { date: "2024-01-01", value: 500, type: "Cash" },
-  { date: "2024-01-02", value: 550, type: "Cash" },
-  { date: "2024-01-01", value: 300, type: "Bonds" },
-  { date: "2024-01-02", value: 400, type: "Bonds" },
-  ];
-
-  const dummyStockData = [
-  { date: "2024-01-01", value: 1000, type: "MSFT" },
-  { date: "2024-01-02", value: 700, type: "MSFT" },
-  { date: "2024-01-01", value: 500, type: "AAPL" },
-  { date: "2024-01-02", value: 600, type: "AAPL" },
-  { date: "2024-01-01", value: 120, type: "DIS" },
-  { date: "2024-01-02", value: 150, type: "DIS" },
-  ];
+  // Fetch data when the component is mounted
+  onMounted(() => {
+    fetchAssets();
+    fetchStocks();
+    fetchCash();
+  });
 
   </script>
   
