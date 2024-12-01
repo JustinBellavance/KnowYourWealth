@@ -1,3 +1,4 @@
+#app/routes.py
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.security import OAuth2PasswordBearer
 import os
@@ -130,6 +131,23 @@ async def get_chart_data(portfolio_id: int):
     if not portfolio_historical_data:
         raise HTTPException(status_code=404, detail="Couldn't retrieve historical data")
     return {"historical_data": portfolio_historical_data}
+
+@app.put("/stocks/buy/{portfolio_id}")
+async def buy_stock(portfolio_id: int, request: Request):
+    data = await request.json()
+    ticker = data['ticker']
+    price = data['price']
+    quantity = data['quantity']
+    date = data['date']
+    # action = 'add'
+
+    # if not stockIsInYF(ticker):
+    #     raise HTTPException(status_code=404, detail="Stock not found in Yahoo Finance")
+    
+    # new_holding = StockHoldings(portfolio_id=portfolio_id, ticker=ticker, price=price, amount=quantity, action=action)
+    # db.session.add(new_holding)
+    # db.session.commit()
+    return {"message": f"Successfully added {quantity} of {ticker} @ {price} in {portfolio_id=} at {date}"}, 200
 
 @app.post("/stocks/{portfolio_id}")
 async def add_stock(portfolio_id: int, request: Request):

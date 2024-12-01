@@ -6,11 +6,20 @@
   
       <main class="content">
         <header class="page-header">
+          <div class="tab-buttons">
+            <TabButton
+              v-for="tab in tabs"
+              :key="tab.label"
+              :label="tab.label"
+              :isActive="activeTab === tab.label"
+              @activate="setActiveTab"
+            />
+          </div>
           <p class="text-6xl font-bold text-black">$50,000</p>
         </header>
 
         <section class="worth-graph">
-            <WorthGraph :data="dummyData" :width=1300 :height=500></WorthGraph>
+            <WorthGraph :data="currentData" :width=1300 :height=500></WorthGraph>
         </section>
   
         <section class="portfolio-overview">
@@ -38,6 +47,28 @@
   <script setup lang="ts">
   import StockSidebar from "@/components/StockSidebar.vue";
   import WorthGraph from "@/components/WorthGraph.vue"
+  import TabButton from "@/components/TabButton.vue"
+
+  import { ref, computed } from 'vue';
+
+  // Define tabs
+  const tabs = [
+    { label: 'All Assets' },
+    { label: 'Stocks' },
+  ];
+
+  // Active tab state
+  const activeTab = ref(tabs[0].label); // Default to 'All Assets'
+
+  // Function to update the active tab
+  const setActiveTab = (label: string) => {
+    activeTab.value = label;
+  };
+
+  // Computed property for dynamic data
+  const currentData = computed(() => {
+    return activeTab.value === 'All Assets' ? dummyData : dummyStockData;
+  });
   
   const overviewData = [
     { title: "Total Net Worth", value: "$50,000" },
@@ -58,7 +89,16 @@
   { date: "2024-01-02", value: 550, type: "Cash" },
   { date: "2024-01-01", value: 300, type: "Bonds" },
   { date: "2024-01-02", value: 400, type: "Bonds" },
-];
+  ];
+
+  const dummyStockData = [
+  { date: "2024-01-01", value: 1000, type: "MSFT" },
+  { date: "2024-01-02", value: 700, type: "MSFT" },
+  { date: "2024-01-01", value: 500, type: "AAPL" },
+  { date: "2024-01-02", value: 600, type: "AAPL" },
+  { date: "2024-01-01", value: 120, type: "DIS" },
+  { date: "2024-01-02", value: 150, type: "DIS" },
+  ];
 
   </script>
   
@@ -124,6 +164,13 @@
   
   .recent-transactions strong {
     color: #34495e;
+  }
+
+  .tab-buttons {
+    display: flex; 
+    justify-content: flex-start; 
+    gap: 10px; 
+    padding: 10px; 
   }
   </style>
   

@@ -61,12 +61,21 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
+import { useRoute } from 'vue-router';
+import axios from 'axios';
+
+const route = useRoute();
+const portfolioId = route.params.id; // Access the `id` from the URL
 
 const ticker = ref<string>("");
 const price = ref<number | null>(null);
 const quantity = ref<number | null>(null);
 const date = ref<string>(new Date().toISOString().split("T")[0]); // Default to current date
 const isBuying = ref(true); // Tracks whether the action is 'Buy' or 'Sell'
+
+const apiUrl = import.meta.env.VITE_API_URL;
+
+console.log('API URL:', apiUrl);
 
 // Function to set the action type (Buy or Sell)
 const setAction = (action: "buy" | "sell") => {
@@ -101,6 +110,21 @@ const confirmStock = () => {
     console.log("Stock transaction:", stockDetails);
     // Here, you would differentiate backend routes based on stockDetails.action
     // e.g., POST to `/stocks/buy` or `/stocks/sell`
+
+    let url = `${apiUrl}/stocks/buy/${portfolioId}`;
+
+    if (stockDetails.action === 'sell'){
+      url = `${apiUrl}/stocks/sell/${portfolioId}`;
+    }
+
+    axios.put(url, stockDetails)
+    .then(response => {
+      console.log('Response:', response.data);
+    })
+    .catch(error => {
+      console.error('Error:', error);
+    });
+
     clearForm();
   }
 };
