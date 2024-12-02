@@ -32,6 +32,8 @@ class Portfolio(SQLModel, table=True):
         return f"<Portfolio {self.name}>"
 
 class StockHoldings(SQLModel, table=True):
+    __tablename__ = 'stock_holdings'  # Explicitly set the table name to 'stock_holdings'
+
     transaction_id: Optional[int] = Field(default=None, primary_key=True)
     portfolio_id: int = Field(nullable=False)
     ticker: str = Field(nullable=False, max_length=255)

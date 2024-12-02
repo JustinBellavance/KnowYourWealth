@@ -5,8 +5,103 @@ from datetime import datetime, timedelta
 from dateutil.rrule import rrule, DAILY
 from .yfinance_utils import getDailyValue
 
-# SQLModel engine setup
-engine = create_engine(config.DATABASE_URL)
+def getRemainingCash(session: Session, portfolio_id: int) -> float:
+    # Parameterized query to avoid SQL injection
+    query = text("""
+        WITH adjusted_cash AS (
+            SELECT name, interest,
+                CASE
+                    WHEN action = 'remove' THEN -amount
+                    ELSE amount
+                END AS adjusted_amount
+            FROM cash
+            WHERE portfolio_id = :portfolio_id
+        )
+        SELECT name, SUM(adjusted_amount) AS amount, interest
+        FROM adjusted_cash
+        GROUP BY name, interest
+    """)
+
+    # Execute the query with the parameter
+    result = session.exec(query.params(portfolio_id=portfolio_id)).first()
+
+    if result is None:
+        print("No results found.")
+        return 0.0
+
+    print(f"Name: {result.name}, Amount: {result.amount}, Interest: {result.interest}")
+    return result.amount
+
+def getRemainingShares(session : Session, portfolio_id : int, ticker = str) -> float:
+    
+    query = text("""
+        WITH adjusted_shares AS (
+            SELECT ticker,
+                CASE
+                    WHEN action = 'remove' THEN -amount
+                    ELSE amount
+                END AS adjusted_amount
+            FROM stock_holdings
+            WHERE portfolio_id=:portfolio_id AND ticker=:ticker
+        )
+        SELECT ticker, SUM(adjusted_amount) AS amount
+        FROM adjusted_shares
+        GROUP BY ticker
+    """)
+
+    result = session.exec(query.params(portfolio_id=portfolio_id, ticker=ticker)).first()
+    
+    if result is None:
+        print("No results found.")
+        return 0.0
+    
+    print(f"Name: {result.ticker}, Amount: {result.amount}")
+
+    return result.amount
+
+def getCurrentStocks(session : Session, portfolio_id : int) -> list:
+    
+    query = text("""
+        WITH calculated_basis AS (
+            SELECT 
+                ticker,
+                CASE
+                    WHEN action = 'add' THEN amount
+                    ELSE -amount
+                END AS adjusted_amount,
+                CASE
+                    WHEN action = 'add' THEN (amount * price + COALESCE(fees, 0))
+                    ELSE 0
+                END AS adjusted_cost
+            FROM stock_holdings
+            WHERE portfolio_id = :portfolio_id
+        )
+        SELECT 
+            ticker,
+            SUM(adjusted_cost) / NULLIF(SUM(CASE WHEN adjusted_amount > 0 THEN adjusted_amount ELSE 0 END), 0) AS avg_cost_basis,
+            SUM(adjusted_amount) AS total_shares
+        FROM calculated_basis
+        GROUP BY ticker
+        HAVING total_shares > 0; -- Exclude tickers with no remaining shares
+    """)
+
+    results = session.exec(query.params(portfolio_id=portfolio_id)).all()
+    
+    if results is None:
+        print("No results found.")
+        return 0.0
+    
+    current_stocks = [
+        {
+            'name' : result.ticker,
+            'quantity' : result.total_shares,
+            'price' : result.avg_cost_basis,
+        }
+    for result in results]
+    
+    print(current_stocks)
+
+    return current_stocks
 
 def getDailyValueRealEstate(real_estate_transactions:list[tuple], until_date) -> dict:
     
@@ -22,7 +117,6 @@ def getDailyValueRealEstate(real_estate_transactions:list[tuple], until_date) ->
         change_in_cash = 0
         
         transaction_date_at_index = str(datetime.strptime(real_estate_transactions[transaction_index][2], "%Y-%m-%d %H:%M:%S.%f").date())
-
 
         # check for transaction on this date
         while(date_str == transaction_date_at_index):

@@ -44,7 +44,7 @@
   const portfolioId = route.params.id; // Access the `id` from the URL
   
   const amount = ref<number | null>(null);
-  const date = ref<string>(new Date().toISOString().split("T")[0]); // Default to current date
+  const date = ref<string>( new Date().toLocaleDateString("en-CA").split("T")[0]); // Default to current date
   const isAdding = ref(true); // Tracks whether the action is 'Add' or 'Remove'
 
   const apiUrl = import.meta.env.VITE_API_URL;
@@ -56,7 +56,7 @@
 
   const clearForm = () => {
     amount.value = 0;
-    date.value = new Date().toISOString().split("T")[0];
+    date.value = new Date().toLocaleDateString("en-CA").split("T")[0];
   };
   
   // Dummy submit function for backend integration
@@ -82,10 +82,10 @@
     if (isConfirmed) {
       console.log("Cash transaction:", cashAction);
 
-      let url = `${apiUrl}/cash/buy/${portfolioId}`;
+      let url = `${apiUrl}/cash/add/${portfolioId}`;
 
-      if (cashAction.action === 'sell'){
-        url = `${apiUrl}/cash/sell/${portfolioId}`;
+      if (cashAction.action === 'remove'){
+        url = `${apiUrl}/cash/remove/${portfolioId}`;
       }
 
       axios.put(url, cashAction)
@@ -93,7 +93,17 @@
         console.log('Response:', response.data);
       })
       .catch(error => {
-        console.error('Error:', error);
+        if (error.response) {
+          // Server responded with a status outside the 2xx range
+          console.error('Error status:', error.response.status);
+          console.error('Error details:', error.response.data);
+          
+          // Show an alert to the user
+          alert(`Error: ${error.response.data.deta || 'Something went wrong. Please try again later.'} Status Code: ${error.response.status}`);
+
+        } else {
+          console.error('Error:', error);
+        }
       });
 
       clearForm();
