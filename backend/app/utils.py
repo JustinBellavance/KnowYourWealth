@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 from dateutil.rrule import rrule, DAILY
 from .yfinance_utils import getDailyValue
 
+from collections import defaultdict
+
 def getRemainingCash(session: Session, portfolio_id: int) -> float:
     # Parameterized query to avoid SQL injection
     query = text("""
@@ -26,10 +28,10 @@ def getRemainingCash(session: Session, portfolio_id: int) -> float:
     result = session.exec(query.params(portfolio_id=portfolio_id)).first()
 
     if result is None:
-        print("No results found.")
+        #print("No results found.")
         return 0.0
 
-    print(f"Name: {result.name}, Amount: {result.amount}, Interest: {result.interest}")
+    #print(f"Name: {result.name}, Amount: {result.amount}, Interest: {result.interest}")
     return result.amount
 
 def getRemainingShares(session : Session, portfolio_id : int, ticker = str) -> float:
@@ -55,12 +57,38 @@ def getRemainingShares(session : Session, portfolio_id : int, ticker = str) -> f
         print("No results found.")
         return 0.0
     
-    print(f"Name: {result.ticker}, Amount: {result.amount}")
+    #print(f"Name: {result.ticker}, Amount: {result.amount}")
 
     return result.amount
 
-def getCurrentStocks(session : Session, portfolio_id : int) -> list:
+def getFirstTransactionDate(session: Session, portfolio_id: int, until_date: datetime) -> datetime:
     
+    query = text("""
+                 SELECT MIN(date(date)) as first_transaction_date
+                 FROM stock_holdings sh
+                 WHERE sh.portfolio_id = :portfolio_id AND sh.date < :until_date
+                 UNION
+                 SELECT MIN(date(date)) as first_transaction_date
+                 FROM cash c
+                 WHERE c.portfolio_id = :portfolio_id AND c.date < :until_date
+                 """)
+    
+    result = session.exec(query.params(portfolio_id=portfolio_id, until_date=until_date)).first()
+    
+    if result and result.first_transaction_date:
+        return result.first_transaction_date
+    else:
+        # Return None if no results found or if the date is invalid
+        return None
+    
+def getHistoricalAssets(session : Session, portfolio_id : int, until_date : datetime) -> list:
+    allStocks = getHistoricalStocks(session, portfolio_id, until_date, True)
+    allCash = getHistoricalCash(session, portfolio_id, until_date, True)
+    
+    return(allStocks + allCash)
+
+def getHistoricalStocks(session : Session, portfolio_id : int, until_date : datetime, consider_all_assets : bool = False) -> list:
+
     query = text("""
         WITH calculated_basis AS (
             SELECT 
@@ -72,20 +100,22 @@ def getCurrentStocks(session : Session, portfolio_id : int) -> list:
                 CASE
                     WHEN action = 'add' THEN (amount * price + COALESCE(fees, 0))
                     ELSE 0
-                END AS adjusted_cost
+                END AS adjusted_cost,
+                date(date) AS transaction_date
             FROM stock_holdings
-            WHERE portfolio_id = :portfolio_id
+            WHERE portfolio_id = :portfolio_id AND date < :until_date
         )
         SELECT 
             ticker,
+            transaction_date,
             SUM(adjusted_cost) / NULLIF(SUM(CASE WHEN adjusted_amount > 0 THEN adjusted_amount ELSE 0 END), 0) AS avg_cost_basis,
             SUM(adjusted_amount) AS total_shares
         FROM calculated_basis
-        GROUP BY ticker
-        HAVING total_shares > 0; -- Exclude tickers with no remaining shares
+        GROUP BY ticker, transaction_date
+        HAVING SUM(adjusted_amount) > 0;
     """)
 
-    results = session.exec(query.params(portfolio_id=portfolio_id)).all()
+    results = session.exec(query.params(portfolio_id=portfolio_id, until_date=until_date)).all()
     
     if results is None:
         print("No results found.")
@@ -96,12 +126,153 @@ def getCurrentStocks(session : Session, portfolio_id : int) -> list:
             'name' : result.ticker,
             'quantity' : result.total_shares,
             'price' : result.avg_cost_basis,
+            'date' : result.transaction_date,
         }
     for result in results]
     
-    print(current_stocks)
+    #print(current_stocks)
+    first_date = None
+    
+    if consider_all_assets:
+        first_date = getFirstTransactionDate(session, portfolio_id, until_date)
+    
+    
+    historical_stocks = populateDailyStocks(until_date, current_stocks, first_date)
 
-    return current_stocks
+    #print(historical_stocks)
+
+    return historical_stocks
+
+def populateDailyStocks(until_date: datetime, historical_stocks: list, first_transaction_date: datetime = None) -> list:
+    if not historical_stocks:
+        return []
+
+    historical_dict = defaultdict(lambda: defaultdict(lambda: 0))  # Default value of 0 for missing data
+    for entry in historical_stocks:
+        key = (entry["name"], entry["date"])
+        historical_dict[key] = {
+            "price": entry["price"],
+            "amount": entry["quantity"],
+            "value": entry["quantity"] * entry["price"]
+        }
+
+    tickers = {entry["name"] for entry in historical_stocks}
+
+    first_date = datetime.strptime(historical_stocks[0]["date"], "%Y-%m-%d").date()
+    
+    if first_transaction_date:
+        first_date = datetime.strptime(first_transaction_date, "%Y-%m-%d").date()    
+    
+    last_date = until_date.date()
+
+    populated_stocks = {ticker: [] for ticker in tickers}
+
+    for ticker in tickers:
+        last_known_price = 0
+        last_known_amount = 0
+        stock_purchased = False  # Track if any stock has been purchased
+
+        current_date = first_date
+        while current_date <= last_date:
+            date_str = current_date.strftime("%Y-%m-%d")
+            key = (ticker, date_str)
+
+            if key in historical_dict:
+                data = historical_dict[key]
+                last_known_price = data["price"]
+                last_known_amount = data["amount"]
+                stock_purchased = True
+                value = data["value"]
+            else:
+                if stock_purchased:
+                    value = last_known_price * last_known_amount
+                else:
+                    value = 0  # If no stock purchased yet, set value to 0
+
+            populated_stocks[ticker].append({
+                "name": ticker,
+                "date": date_str,
+                "price": last_known_price,
+                "quantity": last_known_amount,
+                "value": value
+            })
+
+            current_date += timedelta(days=1)
+
+    result = []
+    for records in populated_stocks.values():
+        result.extend(records)
+
+    return result
+
+def getHistoricalCash(session : Session, portfolio_id : int, until_date : datetime, consider_all_assets : bool = False) -> list:
+    
+    historical_cash = []
+    
+    query = text("""
+    SELECT 
+        date(date) AS transaction_date,
+        SUM(CASE WHEN action = 'add' THEN amount ELSE -amount END) AS daily_net_change,
+        SUM(SUM(CASE WHEN action = 'add' THEN amount ELSE -amount END)) OVER (
+            PARTITION BY portfolio_id
+            ORDER BY date(date)
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS cumulative_value
+    FROM cash
+    WHERE portfolio_id = :portfolio_id AND date < :until_date
+    GROUP BY transaction_date, portfolio_id
+    ORDER BY transaction_date;
+    """)
+
+    results = session.exec(query.params(portfolio_id=portfolio_id, until_date=until_date)).all()
+    
+    historical_cash = [{"value": row[1], "date": row[0]} for row in results]
+    
+    first_date = None
+    
+    if consider_all_assets:
+        first_date = getFirstTransactionDate(session, portfolio_id, until_date)
+    
+    
+    historical_cash = populateDailyCash(until_date, historical_cash, first_date)    
+    return historical_cash
+
+def populateDailyCash(until_date: datetime, historical_cash: list, first_transaction_date: datetime = None ):
+    if not historical_cash:
+        return []
+
+    # Create a dictionary for cash data with the date as the key
+    historical_cash_dict = {entry["date"]: entry["value"] for entry in historical_cash}
+
+    first_date = datetime.strptime(historical_cash[0]["date"], "%Y-%m-%d").date()
+    
+    if first_transaction_date:
+        first_date = datetime.strptime(first_transaction_date, "%Y-%m-%d").date()
+
+    last_date = until_date.date()
+
+    populated_cash = []
+    last_known_value = 0
+
+    current_date = first_date
+    while current_date <= last_date:
+        date_str = current_date.strftime("%Y-%m-%d")
+
+        value = historical_cash_dict.get(date_str, last_known_value)
+
+        populated_cash.append({
+            "name": "Cash",
+            "value": value,
+            "date": date_str
+        })
+
+        # Update the cash value if it's available for this date
+        if date_str in historical_cash_dict:
+            last_known_value = historical_cash_dict[date_str]
+
+        current_date += timedelta(days=1)
+
+    return populated_cash
 
 def getDailyValueRealEstate(real_estate_transactions:list[tuple], until_date) -> dict:
     

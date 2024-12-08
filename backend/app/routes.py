@@ -6,7 +6,7 @@ import os
 import jwt
 from sqlmodel import Session, select
 from app.models import Users, Portfolio, StockHoldings, Cash, Debt, RealEstate
-from app.utils import getStockFromPortfolio, getRemainingCash, getRemainingShares, getCurrentStocks
+from app.utils import getStockFromPortfolio, getHistoricalCash, getRemainingCash, getRemainingShares, getHistoricalStocks, getHistoricalAssets
 from app.yfinance_utils import stockIsInYF
 from datetime import datetime, timedelta
 from instance.config import db
@@ -143,116 +143,29 @@ async def remove_cash(portfolio_id: int, request: Request, session: SessionDep):
 @app.get('/assets/{portfolio_id}')
 async def get_assets(portfolio_id: int, session: SessionDep):
     
-    return [
-            {
-                'name' : "Stocks",
-                'value' : 1000,
-                'date' : "2024-01-01"
-            },
-            {
-                'name' : "Stocks",
-                'value' : 1200, 
-                'date' : "2024-01-02"   
-            },
-            {
-                'name' : "Stocks",
-                'value' : 1400,
-                'date' : "2024-01-03"
-            },
-            {
-                'name' : "Stocks",
-                'value' : 1600, 
-                'date' : "2024-01-04"   
-            },
-            {
-                'name' : "Cash",
-                'value' : 500,
-                'date' : "2024-01-01"
-            },
-            {
-                'name' : "Cash",
-                'value' : 1000,
-                'date' : "2024-01-02"
-            },
-            {
-                'name' : "Cash",
-                'value' : 900,
-                'date' : "2024-01-03"
-            },
-            {
-                'name' : "Cash",
-                'value' : 1200,
-                'date' : "2024-01-04"
-            },
-        ]
+    current_date = datetime.now()
+    
+    all_assets = getHistoricalAssets(session, portfolio_id, current_date)
+    
+    print(all_assets)
+    
+    return all_assets
     
 @app.get('/stocks/{portfolio_id}')
 async def get_stocks(portfolio_id: int, session: SessionDep):
-    
-    dummyStocks = [
-            {'name' : 'MSFT',
-            'price' : 500,
-            'quantity' : 10,
-            'value' : 5000,
-            'date' : "2024-01-01"
-            },
-            {'name' : 'MSFT',
-            'price' : 400,
-            'quantity' : 20,
-            'value' : 8000,
-            'date' : "2024-01-02"
-            },
-            {'name' : 'AAPL',
-            'price' : 200,
-            'quantity' : 50,
-            'value' : 10000,
-            'date' : "2024-01-01"
-            },
-            {'name' : 'AAPL',
-            'price' : 250,
-            'quantity' : 50,
-            'value' : 12500,
-            'date' : "2024-01-02"
-            },
-            {'name' : 'DIS',
-            'price' : 90,
-            'quantity' : 50,
-            'value' : 4500,
-            'date' : "2024-01-01"
-            },
-            {'name' : 'DIS',
-            'price' : 100,
-            'quantity' : 50,
-            'value' : 5000,
-            'date' : "2024-01-02"
-            },
-        ]
-    
-    current_stocks = getCurrentStocks(session, portfolio_id)
+        
+    current_date = datetime.now()
+    historical_stocks = getHistoricalStocks(session, portfolio_id, current_date)
       
-    return current_stocks
+    return historical_stocks
     
 @app.get('/cash/{portfolio_id}')
 async def get_cash(portfolio_id: int, session: SessionDep):
     
-    return [
-            {
-                'value' : 500,
-                'date' : "2024-01-01"
-            },
-            {
-                'value' : 1000,
-                'date' : "2024-01-02"
-            },
-            {
-                'value' : 900,
-                'date' : "2024-01-03"
-            },
-            {
-                'value' : 1200,
-                'date' : "2024-01-04"
-            },
-        ]
+    current_date = datetime.now()
+    historical_cash = getHistoricalCash(session, portfolio_id, current_date)
+        
+    return historical_cash
 
 
 # @app.post("/login")

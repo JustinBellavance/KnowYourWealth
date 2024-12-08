@@ -23,7 +23,6 @@
   .sidebar {
     top: 0;
     left: 0;
-    width: 300px;
     height: 100%;
     padding: 20px;
     background-color: #2c3e50;

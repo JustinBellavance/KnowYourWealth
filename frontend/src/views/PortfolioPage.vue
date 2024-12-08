@@ -19,15 +19,14 @@
         </header>
 
         <section class="worth-graph">
-            <WorthGraph :data="currentData" :width=1300 :height=500></WorthGraph>
+            <WorthGraph :data="graphData" :width=1300 :height=500></WorthGraph>
         </section>
   
         <section class="portfolio-overview p-1 m-3">
-        <p class="text-3xl">Details</p>
-        <div class="overview-grid mt-4 mx-0 px-0">
-          <AssetCard v-for="(asset, index) in overviewData" :key="index" :asset="asset" />
-        </div>
-      </section>
+          <div class="overview-grid mt-4 mx-0 px-0">
+            <AssetCard v-for="(asset, index) in overviewData" :key="index" :asset="asset" />
+          </div>
+        </section>
   
         <!-- <section class="recent-transactions">
           <h2>Recent Transactions</h2>
@@ -76,12 +75,15 @@
   };
 
   // Computed property for dynamic data
-  const currentData = computed(() => {
+  const graphData = computed(() => {
     if (activeTab.value === "All"){
+      console.log(assets.value)
       return assets.value;
     } else if (activeTab.value === "Stocks"){
+      console.log(stocks.value)
       return stocks.value;
     } else if (activeTab.value === "Cash"){
+      console.log(cash.value)
       return cash.value;
     }
   });
@@ -160,7 +162,6 @@
     { title: "Cash", value: cashTotal.value },
   ]);
 
-  // Fetch assets on component mount
   const fetchStocks = async () => {
     try {
       const response = await axios.get(`${apiUrl}/stocks/${portfolioId}`);
@@ -171,7 +172,6 @@
     }
   };
   
-    // Fetch assets on component mount
     const fetchCash = async () => {
     try {
       const response = await axios.get(`${apiUrl}/cash/${portfolioId}`);
@@ -211,12 +211,7 @@
   
   .portfolio-overview {
     margin-bottom: 30px;
-  }
-  
-  .portfolio-overview .overview-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-      gap: 20px;  /* Ensure there's enough gap between the cards */
+    width: 1300px;
   }
 
   .tab-buttons {

@@ -12,10 +12,10 @@
           <table>
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Quantity</th>
-                <th>Price</th>
-                <th>Value</th>
+                <th>Ticker Symbol</th>
+                <th>Number of Shares</th>
+                <th>Average Price</th>
+                <th>Total Value</th>
               </tr>
             </thead>
             <tbody>
