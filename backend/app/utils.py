@@ -3,7 +3,7 @@ from sqlmodel import SQLModel, Field, create_engine, Session
 from sqlalchemy import text
 from datetime import datetime, timedelta
 from dateutil.rrule import rrule, DAILY
-from .yfinance_utils import getDailyValue
+from .yfinance_utils import getDailyValue, getStockHistory
 
 from collections import defaultdict
 
@@ -139,7 +139,7 @@ def getHistoricalStocks(session : Session, portfolio_id : int, until_date : date
     
     historical_stocks = populateDailyStocks(until_date, current_stocks, first_date)
 
-    #print(historical_stocks)
+    print(f"{historical_stocks=}")
 
     return historical_stocks
 
@@ -153,7 +153,6 @@ def populateDailyStocks(until_date: datetime, historical_stocks: list, first_tra
         historical_dict[key] = {
             "price": entry["price"],
             "amount": entry["quantity"],
-            "value": entry["quantity"] * entry["price"]
         }
 
     tickers = {entry["name"] for entry in historical_stocks}
@@ -164,10 +163,16 @@ def populateDailyStocks(until_date: datetime, historical_stocks: list, first_tra
         first_date = datetime.strptime(first_transaction_date, "%Y-%m-%d").date()    
     
     last_date = until_date.date()
-
+    
     populated_stocks = {ticker: [] for ticker in tickers}
 
     for ticker in tickers:
+        
+        # get stock price change via yfinance
+        stock_history = getStockHistory(ticker, first_date, until_date )
+        print(stock_history)
+        print(stock_history.shape)
+        
         last_known_price = 0
         last_known_amount = 0
         stock_purchased = False  # Track if any stock has been purchased
@@ -176,16 +181,34 @@ def populateDailyStocks(until_date: datetime, historical_stocks: list, first_tra
         while current_date <= last_date:
             date_str = current_date.strftime("%Y-%m-%d")
             key = (ticker, date_str)
+            
+            price_change = 0
+            price_today = 0
+            price_yesterday = 0
+            
+            price_today_series = stock_history[stock_history['date'] == date_str]['close']
+            if len(price_today_series.values) > 0:
+                price_today = price_today_series.values[0]
+                
+            if (current_date - timedelta(days=1)) > first_date and price_today != 0:
+                price_yesterday_series = stock_history[stock_history['date'] == (current_date - timedelta(days=1)).strftime("%Y-%m-%d")]['close']
 
+                if len(price_yesterday_series.values) > 0:
+                    price_yesterday = price_yesterday_series.values[0]
+                
+            
+            if price_yesterday:
+                price_change = price_today - price_yesterday
+                
             if key in historical_dict:
                 data = historical_dict[key]
                 last_known_price = data["price"]
                 last_known_amount = data["amount"]
                 stock_purchased = True
-                value = data["value"]
+                value = (data["price"] + price_change) * data['amount']
             else:
                 if stock_purchased:
-                    value = last_known_price * last_known_amount
+                    value = (last_known_price + price_change) * last_known_amount
                 else:
                     value = 0  # If no stock purchased yet, set value to 0
 
