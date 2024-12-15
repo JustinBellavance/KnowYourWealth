@@ -57,7 +57,7 @@ async def add_stock(portfolio_id: int, request: Request, session: SessionDep):
     # if not stockIsInYF(ticker):
     #     raise HTTPException(status_code=404, detail="Stock not found in Yahoo Finance")
     
-    new_holding = StockHoldings(portfolio_id=portfolio_id, ticker=ticker, price=price, amount=quantity, action="add")
+    new_holding = StockHoldings(portfolio_id=portfolio_id, ticker=ticker, price=price, amount=quantity, date = date, action="add")
     
     session.add(new_holding)
     session.commit()
@@ -97,13 +97,16 @@ async def add_cash(portfolio_id: int, request: Request, session: SessionDep):
     name = None
     amount = data['amount']
     date = data['date']
-    interest = None
-
+    interest = data['interest']
+    
+    date = datetime.strptime(date,"%Y-%m-%d").date()
+    
     new_cash = Cash(
         portfolio_id=portfolio_id,
         name=name,
         amount=amount,
         interest=interest,
+        date=date,
         action='add'
     )
 
@@ -118,8 +121,10 @@ async def remove_cash(portfolio_id: int, request: Request, session: SessionDep):
     name = None
     amount = data['amount']
     date = data['date']
-    interest = None
+    interest = date['interest'] #TODO : check if there's cash with that interest rate.
     
+    date = datetime.strptime(date,"%Y-%m-%d").date()
+
     remaining_cash = getRemainingCash(session, portfolio_id)
         
     if amount > remaining_cash:

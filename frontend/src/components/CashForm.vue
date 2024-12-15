@@ -26,8 +26,14 @@
         />
       </div>
       <div class="form-group">
+        <label for="interest">Interest % (Annualized)</label>
+        <input type="interest" id="interest" placeholder="%0" min="0" v-model="interest" />
+      </div>
+      <div class="form-group">
         <label for="date">Date</label>
         <input type="date" id="date" v-model="date" />
+        <div>
+        </div>
       </div>
       <button @click="confirmCash">
         {{ isAdding ? 'Submit Add' : 'Submit Remove' }}
@@ -45,6 +51,8 @@
   
   const amount = ref<number | null>(null);
   const date = ref<string>( new Date().toLocaleDateString("en-CA").split("T")[0]); // Default to current date
+  const interest = ref<number>(0);
+  
   const isAdding = ref(true); // Tracks whether the action is 'Add' or 'Remove'
 
   const apiUrl = import.meta.env.VITE_API_URL;
@@ -57,6 +65,7 @@
   const clearForm = () => {
     amount.value = 0;
     date.value = new Date().toLocaleDateString("en-CA").split("T")[0];
+    interest.value = 0;
   };
   
   // Dummy submit function for backend integration
@@ -70,12 +79,14 @@
       action: isAdding.value ? "add" : "remove",
       amount: amount.value,
       date: date.value,
+      interest: interest.value,
     };
 
     const isConfirmed = confirm(`
         Please confirm the following details:
         Action: ${cashAction.action.toUpperCase()}
         Amount: $${cashAction.amount.toFixed(2)}
+        Interest (Annualized) : %${cashAction.interest}
         Date: ${cashAction.date}
     `);
 

@@ -236,11 +236,7 @@ def getHistoricalCash(session : Session, portfolio_id : int, until_date : dateti
     SELECT 
         date(date) AS transaction_date,
         SUM(CASE WHEN action = 'add' THEN amount ELSE -amount END) AS daily_net_change,
-        SUM(SUM(CASE WHEN action = 'add' THEN amount ELSE -amount END)) OVER (
-            PARTITION BY portfolio_id
-            ORDER BY date(date)
-            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-        ) AS cumulative_value
+        interest
     FROM cash
     WHERE portfolio_id = :portfolio_id AND date < :until_date
     GROUP BY transaction_date, portfolio_id
@@ -249,22 +245,25 @@ def getHistoricalCash(session : Session, portfolio_id : int, until_date : dateti
 
     results = session.exec(query.params(portfolio_id=portfolio_id, until_date=until_date)).all()
     
-    historical_cash = [{"value": row[1], "date": row[0]} for row in results]
+    historical_cash = [{"value": row[1], "date": row[0], "interest" : row[2]} for row in results]
     
     first_date = None
     
     if consider_all_assets:
         first_date = getFirstTransactionDate(session, portfolio_id, until_date)
+        
+    print(historical_cash)
     
+    historical_cash = populateDailyCash(until_date, historical_cash, first_date)
     
-    historical_cash = populateDailyCash(until_date, historical_cash, first_date)    
+    print(historical_cash)
+      
     return historical_cash
 
-def populateDailyCash(until_date: datetime, historical_cash: list, first_transaction_date: datetime = None ):
+def populateDailyCash(until_date: datetime, historical_cash: list, first_transaction_date: datetime = None):
     if not historical_cash:
         return []
 
-    # Create a dictionary for cash data with the date as the key
     historical_cash_dict = {entry["date"]: entry["value"] for entry in historical_cash}
 
     first_date = datetime.strptime(historical_cash[0]["date"], "%Y-%m-%d").date()
@@ -273,23 +272,32 @@ def populateDailyCash(until_date: datetime, historical_cash: list, first_transac
         first_date = datetime.strptime(first_transaction_date, "%Y-%m-%d").date()
 
     last_date = until_date.date()
-
     populated_cash = []
     last_known_value = 0
+    last_known_interest_rate = 0.0  # Default interest rate if none is provided
 
     current_date = first_date
     while current_date <= last_date:
         date_str = current_date.strftime("%Y-%m-%d")
+        
+        daily_interest_rate = last_known_interest_rate / 100 / 365
 
+        if current_date != first_date:
+            last_known_value += last_known_value * daily_interest_rate
+            
+        if date_str in historical_cash_dict:
+            last_known_value = historical_cash_dict[date_str]["value"]
+            last_known_interest_rate = historical_cash_dict[date_str]["interest"]
+            
         value = historical_cash_dict.get(date_str, last_known_value)
 
         populated_cash.append({
             "name": "Cash",
             "value": value,
+            "interest" : last_known_interest_rate,
             "date": date_str
         })
 
-        # Update the cash value if it's available for this date
         if date_str in historical_cash_dict:
             last_known_value = historical_cash_dict[date_str]
 
