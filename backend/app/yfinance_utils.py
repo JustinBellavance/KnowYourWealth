@@ -65,6 +65,8 @@ def getStockHistory(ticker: str, date1 : str, date2: str) -> pd.DataFrame:
     # yahoo doesn't give weekend data, we we will populate it ourselves.
     ticker_history_with_weekends_df = insertWeekends(ticker_history_df)
     
+    print(f"{ticker_history_with_weekends_df=}")
+    
     return ticker_history_with_weekends_df
 
 

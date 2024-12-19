@@ -1,10 +1,11 @@
 <template>
+    <HeaderHome></HeaderHome>
     <div class="portfolio-page">
       <div class="sidebar">
-        <StockSidebar />
+        <StockSidebar @update-data="refreshData"/>
       </div>
       
-      <main class="content m-3">
+      <main ref='myDiv' class="content m-3">
         <header class="page-header">
           <p class="text-6xl font-bold text-black">{{cadConvert(totalNetWorth)}}</p>
           <div class="tab-buttons">
@@ -17,9 +18,10 @@
             />
           </div>
         </header>
-
         <section class="worth-graph">
-            <WorthGraph :data="graphData" :width=1300 :height=500></WorthGraph>
+          <div v-if="ninetyFivePercentWidth">
+            <WorthGraph :data="graphData" :width="ninetyFivePercentWidth" :height="500"></WorthGraph>
+          </div>
         </section>
   
         <section class="portfolio-overview p-1 m-3">
@@ -50,12 +52,29 @@
   import AssetCard from "@/components/AssetCard.vue"
   import StockCard from "@/components/StockCard.vue"
 
-  import { ref, computed, onMounted } from 'vue';
+  import HeaderHome from "@/components/HeaderHome.vue"
+
+  import { ref, computed, onMounted, onUpdated } from 'vue';
   import { useRoute } from 'vue-router';
   import axios from 'axios';
+  import debounce from 'lodash/debounce';
 
   const route = useRoute();
-  const portfolioId = route.params.id; // Access the `id` from the URL
+  const portfolioId = route.params.id;
+
+  const myDiv = ref(null);
+  const ninetyFivePercentWidth = ref(0); // Default value for 95% width
+
+  const updateWidth = () => {
+    if (myDiv.value) {
+      var divWidth = myDiv.value.offsetWidth; // Get the width of the <main> element
+      ninetyFivePercentWidth.value = divWidth * 0.97; // Set the width to 95% of the div
+    }
+  };
+
+  const optimizedUpdate = debounce(() => {
+    updateWidth();
+  }, 200); // Debouncing to avoid frequent calculations during resizing
 
   const apiUrl = import.meta.env.VITE_API_URL;
 
@@ -81,17 +100,20 @@
   // Computed property for dynamic data
   const graphData = computed(() => {
     if (activeTab.value === "All"){
-      console.log(assets.value)
       return assets.value;
     } else if (activeTab.value === "Stocks"){
-      console.log(stocks.value)
       return stocks.value;
     } else if (activeTab.value === "Cash"){
-      console.log(cash.value)
       return cash.value;
     }
   });
-  
+
+  const refreshData = () => {
+    fetchAssets();
+    fetchStocks();
+    fetchCash();
+  };
+
   // const recentTransactions = [
   //   { type: "Stock Purchase", details: "Bought 10 shares of AAPL", date: "2024-11-28" },
   //   { type: "Cash Deposit", details: "Deposited $500", date: "2024-11-27" },
@@ -105,7 +127,6 @@
   const fetchAssets = async () => {
     try {
       const response = await axios.get(`${apiUrl}/assets/${portfolioId}`);
-      console.log("Response:", response.data);
       assets.value = response.data;
     } catch (error) {
       console.error("Error:", error);
@@ -145,9 +166,6 @@
 
       // Return the stock with the most recent date
 
-      console.log(stocksForName[0].quantity * stocksForName[0].price);
-      console.log(stocksForName[0].quantity, stocksForName[0].price);
-
       return {
         name,
         value: stocksForName[0].quantity * stocksForName[0].price,
@@ -182,9 +200,6 @@
 
       // Return the stock with the most recent date
 
-      console.log(cashForName[0].quantity * cashForName[0].price);
-      console.log(cashForName[0].quantity, cashForName[0].price);
-
       return {
         name,
         interest : cashForName[0].interest,
@@ -209,7 +224,6 @@
   const fetchStocks = async () => {
     try {
       const response = await axios.get(`${apiUrl}/stocks/${portfolioId}`);
-      console.log("Response:", response.data);
       stocks.value = response.data;
     } catch (error) {
       console.error("Error:", error);
@@ -219,7 +233,6 @@
     const fetchCash = async () => {
     try {
       const response = await axios.get(`${apiUrl}/cash/${portfolioId}`);
-      console.log("Response:", response.data);
       cash.value = response.data;
     } catch (error) {
       console.error("Error:", error);
@@ -228,9 +241,17 @@
 
   // Fetch data when the component is mounted
   onMounted(() => {
+    optimizedUpdate(); // Initial calculation on mount
+    window.addEventListener('resize', optimizedUpdate); // Recalculate width on resize
+
     fetchAssets();
     fetchStocks();
     fetchCash();
+  });
+
+  // Clean up the event listener when the component is unmounted
+  onUpdated(() => {
+    optimizedUpdate(); // Recalculate on component updates (optional)
   });
 
   </script>
@@ -244,7 +265,7 @@
   .content {
     flex: 1;
     padding: 20px;
-    background-color: #f8f9fa;
+    background-color: white;
     min-height: 100vh;
   }
   
@@ -255,7 +276,7 @@
   
   .portfolio-overview {
     margin-bottom: 30px;
-    width: 1300px;
+    width: 96%;
   }
 
   .tab-buttons {

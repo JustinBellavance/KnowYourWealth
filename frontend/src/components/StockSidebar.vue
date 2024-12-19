@@ -3,10 +3,10 @@
       <transition name="fade" mode="out-in">
         <div class="form-container">
           <Accordion label="Stocks">
-            <StockForm />
+            <StockForm @update-data="refreshData"/>
           </Accordion>
           <Accordion label="Cash">
-            <CashForm />
+            <CashForm @update-data="refreshData"/>
           </Accordion>
         </div>
       </transition>
@@ -14,9 +14,22 @@
   </template>
   
   <script setup lang="ts">
+  import {defineEmits} from "vue";
+
   import StockForm from './StockForm.vue';
   import CashForm from './CashForm.vue';
-  import Accordion from './Accordion.vue'; // Import the Accordion component
+  import Accordion from './Accordion.vue'; 
+
+  const emit = defineEmits(['update-data']);
+
+  const updateData = () => {
+    emit('update-data'); // Emit the event
+  };
+
+  function refreshData(){
+    updateData();
+  }
+
   </script>
   
   <style scoped>
@@ -30,14 +43,14 @@
     display: flex;
     flex-direction: column;
     gap: 20px;
+    max-width : 250px;
+    min-width: 250px;
+    margin-left : 2.5px;
   }
   
   .form-container {
     padding: 10px;
     background-color: white;
-    border-color : black;
-    border-width: 2px;
-    border-radius: 5px;
     margin-left : 10px;
   }
   

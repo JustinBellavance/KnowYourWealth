@@ -9,7 +9,7 @@
       <nav class="navigation">
         <router-link to="/about" class="nav-link">About</router-link>
         <a href="https://discord.gg/qxN52prMyM" target="_blank" class="nav-link">Community</a>
-        <router-link to="/signup" class="nav-link">Sign Up</router-link>
+        <a href="https://tally.so/r/wvq1R4" target="_blank" class="nav-link">Sign Up</a>
       </nav>
     </header>
   </template>

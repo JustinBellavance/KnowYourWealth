@@ -6,7 +6,7 @@ import PortfolioPage from "@/views/PortfolioPage.vue"
 const routes: RouteRecordRaw[] = [
   { path: "/", component: LandingPage },
   { path: "/signup", component: SignupPage },
-  { path: "/portfolio/:id", component: PortfolioPage}
+  { path: "/portfolio/:id", component: PortfolioPage},
 ];
 
 const router = createRouter({

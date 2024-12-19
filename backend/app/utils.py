@@ -93,10 +93,12 @@ def getHistoricalStocks(session : Session, portfolio_id : int, until_date : date
                     ELSE -amount
                 END AS adjusted_amount,
                 CASE
-                    WHEN action = 'add' THEN (amount * price + COALESCE(fees, 0))
+                    WHEN action = 'add' THEN (amount * (price + COALESCE(fees, 0) / NULLIF(amount, 0)))
                     ELSE 0
                 END AS adjusted_cost,
-                date(date) AS transaction_date
+                date(date) AS transaction_date,
+                drip,
+                fees
             FROM stock_holdings
             WHERE portfolio_id = :portfolio_id AND date < :until_date
         )
@@ -104,7 +106,9 @@ def getHistoricalStocks(session : Session, portfolio_id : int, until_date : date
             ticker,
             transaction_date,
             SUM(adjusted_cost) / NULLIF(SUM(CASE WHEN adjusted_amount > 0 THEN adjusted_amount ELSE 0 END), 0) AS avg_cost_basis,
-            SUM(adjusted_amount) AS total_shares
+            SUM(adjusted_amount) AS total_shares,
+            drip,
+            fees
         FROM calculated_basis
         GROUP BY ticker, transaction_date
         HAVING SUM(adjusted_amount) > 0;
@@ -122,9 +126,11 @@ def getHistoricalStocks(session : Session, portfolio_id : int, until_date : date
             'quantity' : result.total_shares,
             'price' : result.avg_cost_basis,
             'date' : result.transaction_date,
+            'drip' : result.drip,
+            'fees' : result.fees,
         }
     for result in results]
-    
+        
     first_date = None
     
     if consider_all_assets:
@@ -148,21 +154,30 @@ def populateDailyStocks(until_date: datetime, historical_stocks: list, first_tra
             "amount": entry["quantity"],
         }
 
-    tickers = {entry["name"] for entry in historical_stocks}
-
     first_date = datetime.strptime(historical_stocks[0]["date"], "%Y-%m-%d").date()
     
+    #tickers = {entry["name"] for entry in historical_stocks}
+    
+    tickers = {}
+    for entry in historical_stocks:
+        tickers[entry['name']] = entry["drip"]
+        
+        date = datetime.strptime(entry["date"], "%Y-%m-%d").date()
+        if date < first_date:
+            first_date = date
+
+    
     if first_transaction_date:
-        first_date = datetime.strptime(first_transaction_date, "%Y-%m-%d").date()    
+        first_date = datetime.strptime(first_transaction_date, "%Y-%m-%d").date()
     
     last_date = until_date.date()
     
     populated_stocks = {ticker: [] for ticker in tickers}
 
-    for ticker in tickers:
+    for ticker, drip in tickers.items():
         
         # get stock price change via yfinance
-        stock_history = getStockHistory(ticker, first_date, until_date )
+        stock_history = getStockHistory(ticker, first_date, until_date)
         
         last_known_price = 0
         last_known_amount = 0
@@ -178,6 +193,10 @@ def populateDailyStocks(until_date: datetime, historical_stocks: list, first_tra
             price_yesterday = 0
             
             price_today_series = stock_history[stock_history['date'] == date_str]['close']
+            
+            #TODO: check if dividend
+            
+            
             if len(price_today_series.values) > 0:
                 price_today = price_today_series.values[0]
                 
@@ -250,7 +269,6 @@ def populateDailyCash(until_date: datetime, historical_cash: list, first_transac
     if not historical_cash:
         return []
 
-    print(f"{historical_cash=}")
     historical_cash_dict = {entry["date"]: entry["value"] for entry in historical_cash}
     historical_cash_dict = defaultdict(lambda: defaultdict(lambda: 0))  # Default value of 0 for missing data
     for entry in historical_cash:
@@ -311,6 +329,9 @@ def populateDailyCash(until_date: datetime, historical_cash: list, first_transac
         result.extend(records)
 
     return result
+
+def getTop3Tickers(substring : str):
+    pass
 
 def getDailyValueRealEstate(real_estate_transactions:list[tuple], until_date) -> dict:
     

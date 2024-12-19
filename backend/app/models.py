@@ -39,8 +39,9 @@ class StockHoldings(SQLModel, table=True):
     ticker: str = Field(nullable=False, max_length=255)
     amount: float = Field(nullable=False)
     price: float = Field(nullable=False)
-    fees: Optional[float] = Field(default=None)
+    fees: float = Field(nullable=False, default=0)
     action: str = Field(nullable=False, max_length=255)
+    drip : bool = Field(nullable=False, default=False)
     date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
 
     def __repr__(self):

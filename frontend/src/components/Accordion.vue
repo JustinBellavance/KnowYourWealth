@@ -30,13 +30,14 @@
   <style scoped>
 .accordion {
   margin-bottom: 10px;
-
+  border-color : black;
+  border-width: 2px;
+  border-radius: 5px;
+  max-width: 200px;
 }
 
 .accordion-item {
-  border: 1px solid #ecf0f1;
   border-radius: 5px;
-  margin-bottom: 5px;
   background-color: #34495e;
 }
 
@@ -52,7 +53,7 @@
 
 .accordion-body {
   padding: 15px;
-  background-color: #2c3e50;
+  background-color: white;
 }
 .accordion-toggle-btn {
   margin-left : 10px;

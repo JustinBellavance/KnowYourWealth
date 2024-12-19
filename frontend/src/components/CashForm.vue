@@ -137,75 +137,75 @@
   </script>
   
   <style scoped>
-  .form {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-  }
-  
-  .tab-buttons {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 15px;
-  }
-  
-  .tab-buttons button {
-    padding: 8px 16px;
-    border-radius: 5px;
-    border: 1px solid #ecf0f1;
-    background-color: #34495e;
-    color: white;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background-color 0.3s, color 0.3s;
-  }
-  
-  .tab-buttons button.active {
-    background-color: #3498db;
-    color: white;
-  }
-  
-  .tab-buttons button:hover {
-    background-color: #2c3e50;
-  }
-  
-  .form-group {
-    display: flex;
-    flex-direction: column;
-  }
-  
-  label {
-    margin-bottom: 5px;
-    font-weight: bold;
-    color: #ecf0f1;
-  }
-  
-  input {
-    padding: 8px;
-    border-radius: 4px;
-    border: 1px solid #ecf0f1;
-    background-color: #2c3e50;
-    color: white;
-  }
-  
-  input::placeholder {
-    color: #bdc3c7;
-  }
-  
-  button {
-    padding: 10px;
-    background-color: #27ae60;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 1rem;
-    font-weight: bold;
-    transition: background-color 0.3s;
-  }
-  
-  button:hover {
-    background-color: #2ecc71;
-  }
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.tab-buttons {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.tab-buttons button {
+  padding: 8px 10px;
+  border-radius: 5px;
+  border: 2px solid #34495e;
+  background-color: white;
+  color: black;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.tab-buttons button.active {
+  background-color: #34495e;
+  color: white;
+}
+
+.tab-buttons button:hover {
+  background-color: darkgrey;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+label {
+  margin-bottom: 5px;
+  font-weight: bold;
+  color: black;
+}
+
+input {
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #2c3e50;
+  background-color: white;
+  color: white;
+}
+
+input::placeholder {
+  color: #bdc3c7;
+}
+
+button {
+  padding: 10px;
+  background-color: black;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: bold;
+  transition: background-color 0.3s;
+}
+
+button:hover {
+  background-color: darkgray;
+}
   </style>
   

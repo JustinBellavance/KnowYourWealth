@@ -6,7 +6,7 @@ import os
 import jwt
 from sqlmodel import Session, select
 from app.models import Users, Portfolio, StockHoldings, Cash, Debt, RealEstate
-from app.utils import getStockFromPortfolio, getHistoricalCash, getRemainingCash, getRemainingShares, getHistoricalStocks, getHistoricalAssets
+from app.utils import getTop3Tickers, getStockFromPortfolio, getHistoricalCash, getRemainingCash, getRemainingShares, getHistoricalStocks, getHistoricalAssets
 from app.yfinance_utils import stockIsInYF
 from datetime import datetime, timedelta
 from instance.config import db
@@ -45,6 +45,15 @@ def verify_token(token: str):
     except jwt.PyJWTError:
         return None
 
+@app.get("/tickers")
+async def get_tickers(q : str, request: Request, session: SessionDep):
+    
+    print(f"Tickers, data : {q}")
+    
+    top3 = getTop3Tickers(q)
+    top3 = []
+    return top3
+
 # FastAPI Routes
 @app.put("/stocks/add/{portfolio_id}")
 async def add_stock(portfolio_id: int, request: Request, session: SessionDep):
@@ -53,11 +62,21 @@ async def add_stock(portfolio_id: int, request: Request, session: SessionDep):
     price = data['price']
     quantity = data['quantity']
     date = data['date']
+    fees = data['fees']
+    drip = data['drip']
+
+    date = datetime.strptime(date,"%Y-%m-%d").date()
 
     # if not stockIsInYF(ticker):
     #     raise HTTPException(status_code=404, detail="Stock not found in Yahoo Finance")
     
-    new_holding = StockHoldings(portfolio_id=portfolio_id, ticker=ticker, price=price, amount=quantity, date = date, action="add")
+    new_holding = StockHoldings(portfolio_id=portfolio_id,
+                                ticker=ticker, price=price,
+                                amount=quantity,
+                                date = date,
+                                action="add",
+                                fees = fees,
+                                drip = drip)
     
     session.add(new_holding)
     session.commit()
@@ -71,6 +90,9 @@ async def remove_stock(portfolio_id: int, request: Request, session: SessionDep)
     price = data['price']
     quantity = data['quantity']
     date = data['date']
+    fees = data['fees']
+    
+    date = datetime.strptime(date,"%Y-%m-%d").date()
 
     # TODO : check if stock is (and correct number of shares) in the portfolio before selling
     remaining_shares = getRemainingShares(session, portfolio_id, ticker)
@@ -84,7 +106,7 @@ async def remove_stock(portfolio_id: int, request: Request, session: SessionDep)
     # if not stockIsInYF(ticker):
     #     raise HTTPException(status_code=404, detail="Stock not found in Yahoo Finance")
 
-    new_holding = StockHoldings(portfolio_id=portfolio_id, ticker=ticker, price=price, amount=quantity, action="remove")
+    new_holding = StockHoldings(portfolio_id=portfolio_id, ticker=ticker, price=price, amount=quantity, action="remove", fees = fees)
     
     session.add(new_holding)
     session.commit()
@@ -151,9 +173,7 @@ async def get_assets(portfolio_id: int, session: SessionDep):
     current_date = datetime.now()
     
     all_assets = getHistoricalAssets(session, portfolio_id, current_date)
-    
-    print(all_assets)
-    
+        
     return all_assets
     
 @app.get('/stocks/{portfolio_id}')

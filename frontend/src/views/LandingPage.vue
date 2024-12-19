@@ -10,9 +10,12 @@
             <span class="word3">growing</span>
             <span class="highlight">Wealth</span>
           </h1>
-          <p>An all-encompassing net worth tracker made by Canadians, for Canadians.</p>
+          <p>The first and only all-encompassing net worth tracker made by Canadians, for Canadians.</p>
         </div>
-        <button class="waitlist-button">Join the waitlist</button>
+        <router>
+
+        </router>
+        <button @click="openTallyForm" class="waitlist-button">Join the waitlist</button>
       </div>
       <div class="background">
         <!-- <img src="/path/to/clouds.png" alt="Cloud Background" /> -->
@@ -23,6 +26,11 @@
 
 <script setup lang="ts">
 import Header from "@/components/HeaderHome.vue"
+
+function openTallyForm(){
+  window.open("https://tally.so/r/wvq1R4", "_blank");
+}
+
 </script>
 
 <style scoped>
@@ -47,7 +55,7 @@ import Header from "@/components/HeaderHome.vue"
 }
 
 .hero-content {
-  max-width: 650px;
+  max-width: 1000px;
   margin: 0 auto;
 }
 
@@ -65,23 +73,23 @@ h1 {
 }
 
 .word1 {
-  font-size: 2.5rem; /* Smaller size for 'Track' */
+  font-size: 3rem; /* Smaller size for 'Track' */
   margin-right: 10px;
 }
 
 .word2 {
-  font-size: 3rem; /* Medium size for 'your' */
+  font-size: 3.5rem; /* Medium size for 'your' */
   margin-right: 10px;
 }
 
 .word3 {
-  font-size: 3.5rem; /* Larger size for 'growing' */
+  font-size: 4rem; /* Larger size for 'growing' */
   margin-right: 2px;
 }
 
 .highlight {
   font-style: italic;
-  font-size: 4rem; /* Largest size for 'Wealth' */
+  font-size: 4.5rem; /* Largest size for 'Wealth' */
 }
 
 /* Enhanced Waitlist Button Styling */

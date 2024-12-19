@@ -12,10 +12,17 @@ import * as d3 from "d3";
 // Props for data and dimensions
 const props = defineProps<{
   data: { date: string; value: number; name: string }[];
-  width?: number;
-  height?: number;
+  width: {
+    type: Number,
+    required: true,
+  },
+  height: {
+    type: Number,
+    required: true,
+  },
 }>();
 
+console.log(props.width)
 const defaultWidth = props.width || 800;
 const defaultHeight = props.height || 400;
 
