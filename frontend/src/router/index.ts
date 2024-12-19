@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router";
 import LandingPage from "@/views/LandingPage.vue";
-import SignUpPage from "@/views/SignUpPage.vue";
+import SignupPage from "@/views/SignUpPage.vue";
 import PortfolioPage from "@/views/PortfolioPage.vue"
 
 const routes: RouteRecordRaw[] = [

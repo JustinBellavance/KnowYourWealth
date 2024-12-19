@@ -28,10 +28,8 @@ def getRemainingCash(session: Session, portfolio_id: int) -> float:
     result = session.exec(query.params(portfolio_id=portfolio_id)).first()
 
     if result is None:
-        #print("No results found.")
         return 0.0
 
-    #print(f"Name: {result.name}, Amount: {result.amount}, Interest: {result.interest}")
     return result.amount
 
 def getRemainingShares(session : Session, portfolio_id : int, ticker = str) -> float:
@@ -57,8 +55,6 @@ def getRemainingShares(session : Session, portfolio_id : int, ticker = str) -> f
         print("No results found.")
         return 0.0
     
-    #print(f"Name: {result.ticker}, Amount: {result.amount}")
-
     return result.amount
 
 def getFirstTransactionDate(session: Session, portfolio_id: int, until_date: datetime) -> datetime:
@@ -130,7 +126,6 @@ def getHistoricalStocks(session : Session, portfolio_id : int, until_date : date
         }
     for result in results]
     
-    #print(current_stocks)
     first_date = None
     
     if consider_all_assets:
@@ -139,7 +134,6 @@ def getHistoricalStocks(session : Session, portfolio_id : int, until_date : date
     
     historical_stocks = populateDailyStocks(until_date, current_stocks, first_date)
 
-    print(f"{historical_stocks=}")
 
     return historical_stocks
 
@@ -170,8 +164,6 @@ def populateDailyStocks(until_date: datetime, historical_stocks: list, first_tra
         
         # get stock price change via yfinance
         stock_history = getStockHistory(ticker, first_date, until_date )
-        print(stock_history)
-        print(stock_history.shape)
         
         last_known_price = 0
         last_known_amount = 0
@@ -251,12 +243,8 @@ def getHistoricalCash(session : Session, portfolio_id : int, until_date : dateti
     
     if consider_all_assets:
         first_date = getFirstTransactionDate(session, portfolio_id, until_date)
-        
-    print(historical_cash)
-    
+            
     historical_cash = populateDailyCash(until_date, historical_cash, first_date)
-    
-    print(historical_cash)
       
     return historical_cash
 
@@ -264,6 +252,7 @@ def populateDailyCash(until_date: datetime, historical_cash: list, first_transac
     if not historical_cash:
         return []
 
+    print(f"{historical_cash=}")
     historical_cash_dict = {entry["date"]: entry["value"] for entry in historical_cash}
 
     first_date = datetime.strptime(historical_cash[0]["date"], "%Y-%m-%d").date()
@@ -275,6 +264,8 @@ def populateDailyCash(until_date: datetime, historical_cash: list, first_transac
     populated_cash = []
     last_known_value = 0
     last_known_interest_rate = 0.0  # Default interest rate if none is provided
+    
+    historical_cash_idx = 0
 
     current_date = first_date
     while current_date <= last_date:
@@ -286,8 +277,9 @@ def populateDailyCash(until_date: datetime, historical_cash: list, first_transac
             last_known_value += last_known_value * daily_interest_rate
             
         if date_str in historical_cash_dict:
-            last_known_value = historical_cash_dict[date_str]["value"]
-            last_known_interest_rate = historical_cash_dict[date_str]["interest"]
+            last_known_value = historical_cash[historical_cash_idx]["value"]
+            last_known_interest_rate = historical_cash[historical_cash_idx]["interest"]
+            historical_cash_idx += 1
             
         value = historical_cash_dict.get(date_str, last_known_value)
 

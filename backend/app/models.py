@@ -51,7 +51,7 @@ class Cash(SQLModel, table=True):
     portfolio_id: int = Field(nullable=False)
     name: Optional[str] = Field(default=None, max_length=255)
     amount: float = Field(nullable=False)
-    interest: Optional[float] = Field(default=None)
+    interest: Optional[float] = Field(nullable=False, default=0)
     action: str = Field(nullable=False, max_length=255)
     date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
 
