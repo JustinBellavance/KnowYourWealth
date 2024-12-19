@@ -94,7 +94,7 @@ async def remove_stock(portfolio_id: int, request: Request, session: SessionDep)
 @app.put("/cash/add/{portfolio_id}")
 async def add_cash(portfolio_id: int, request: Request, session: SessionDep):
     data = await request.json()
-    name = None
+    name = data['name']
     amount = data['amount']
     date = data['date']
     interest = data['interest']
@@ -118,7 +118,7 @@ async def add_cash(portfolio_id: int, request: Request, session: SessionDep):
 @app.put("/cash/remove/{portfolio_id}")
 async def remove_cash(portfolio_id: int, request: Request, session: SessionDep):
     data = await request.json()
-    name = None
+    name = data['name']
     amount = data['amount']
     date = data['date']
     interest = date['interest'] #TODO : check if there's cash with that interest rate.

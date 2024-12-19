@@ -8,7 +8,6 @@
         </button>
       </div>
       <div v-show="isOpen" class="accordion-body" @click.stop>
-        <!-- Prevent closing the accordion when clicking inside the body -->
         <slot></slot>
       </div>
     </div>
@@ -31,6 +30,7 @@
   <style scoped>
 .accordion {
   margin-bottom: 10px;
+
 }
 
 .accordion-item {
@@ -42,7 +42,7 @@
 
 .accordion-header {
   padding: 10px;
-  color: white;
+  color: black;
   cursor: pointer;
   display: flex;
   justify-content: space-between;
@@ -53,6 +53,9 @@
 .accordion-body {
   padding: 15px;
   background-color: #2c3e50;
+}
+.accordion-toggle-btn {
+  margin-left : 10px;
 }
 
 .accordion-item.is-open .accordion-header {

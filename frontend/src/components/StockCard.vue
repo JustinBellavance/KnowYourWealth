@@ -12,15 +12,17 @@
           <table>
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Average Annual Interest</th>
+                <th>Ticker Symbol</th>
+                <th>Number of Shares</th>
+                <th>Average Price</th>
                 <th>Total Value</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="(value, key) in asset.details" :key="key">
                 <td>{{ value.name }}</td>
-                <td>{{ value.interest }}%</td>
+                <td>{{ value.quantity }}</td>
+                <td>{{ cadConvert(value.price) }}</td>
                 <td>{{ cadConvert(value.value) }}</td>
               </tr>
             </tbody>

@@ -49,7 +49,7 @@ class StockHoldings(SQLModel, table=True):
 class Cash(SQLModel, table=True):
     transaction_id: Optional[int] = Field(default=None, primary_key=True)
     portfolio_id: int = Field(nullable=False)
-    name: Optional[str] = Field(default=None, max_length=255)
+    name: str = Field(default=None, max_length=255)
     amount: float = Field(nullable=False)
     interest: Optional[float] = Field(nullable=False, default=0)
     action: str = Field(nullable=False, max_length=255)

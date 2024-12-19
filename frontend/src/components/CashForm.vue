@@ -14,7 +14,16 @@
           Remove
         </button>
       </div>
-  
+        <div class="form-group">
+        <label for="name">Name (optional)</label>
+        <input
+          type="text"
+          id="name"
+          v-model="name"
+          placeholder="e.g., HISA"
+          maxlength="10"
+        />
+      </div>
       <div class="form-group">
         <label for="amount">{{ isAdding ? 'Amount to Add' : 'Amount to Remove' }}</label>
         <input
@@ -50,6 +59,7 @@
   const portfolioId = route.params.id; // Access the `id` from the URL
   
   const amount = ref<number | null>(null);
+  const name = ref<string | null>(null);
   const date = ref<string>( new Date().toLocaleDateString("en-CA").split("T")[0]); // Default to current date
   const interest = ref<number>(0);
   
@@ -63,6 +73,7 @@
   };
 
   const clearForm = () => {
+    name.value = "";
     amount.value = 0;
     date.value = new Date().toLocaleDateString("en-CA").split("T")[0];
     interest.value = 0;
@@ -77,6 +88,7 @@
   
     const cashAction = {
       action: isAdding.value ? "add" : "remove",
+      name : name.value,
       amount: amount.value,
       date: date.value,
       interest: interest.value,
@@ -84,6 +96,7 @@
 
     const isConfirmed = confirm(`
         Please confirm the following details:
+        Name: ${cashAction.name}
         Action: ${cashAction.action.toUpperCase()}
         Amount: $${cashAction.amount.toFixed(2)}
         Interest (Annualized) : %${cashAction.interest}

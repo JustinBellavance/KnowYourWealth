@@ -8,7 +8,6 @@ from .yfinance_utils import getDailyValue, getStockHistory
 from collections import defaultdict
 
 def getRemainingCash(session: Session, portfolio_id: int) -> float:
-    # Parameterized query to avoid SQL injection
     query = text("""
         WITH adjusted_cash AS (
             SELECT name, interest,
@@ -221,14 +220,13 @@ def populateDailyStocks(until_date: datetime, historical_stocks: list, first_tra
     return result
 
 def getHistoricalCash(session : Session, portfolio_id : int, until_date : datetime, consider_all_assets : bool = False) -> list:
-    
-    historical_cash = []
-    
+        
     query = text("""
     SELECT 
         date(date) AS transaction_date,
         SUM(CASE WHEN action = 'add' THEN amount ELSE -amount END) AS daily_net_change,
-        interest
+        interest,
+        name
     FROM cash
     WHERE portfolio_id = :portfolio_id AND date < :until_date
     GROUP BY transaction_date, portfolio_id
@@ -237,7 +235,7 @@ def getHistoricalCash(session : Session, portfolio_id : int, until_date : dateti
 
     results = session.exec(query.params(portfolio_id=portfolio_id, until_date=until_date)).all()
     
-    historical_cash = [{"value": row[1], "date": row[0], "interest" : row[2]} for row in results]
+    historical_cash = [{"value": row[1], "date": row[0], "interest" : row[2], "name" : row[3] if row[3] else "Cash"} for row in results]
     
     first_date = None
     
@@ -254,6 +252,15 @@ def populateDailyCash(until_date: datetime, historical_cash: list, first_transac
 
     print(f"{historical_cash=}")
     historical_cash_dict = {entry["date"]: entry["value"] for entry in historical_cash}
+    historical_cash_dict = defaultdict(lambda: defaultdict(lambda: 0))  # Default value of 0 for missing data
+    for entry in historical_cash:
+        key = (entry["name"], entry["date"])
+        historical_cash_dict[key] = {
+            "value": entry["value"],
+            "interest": entry["interest"],
+        }
+        
+    cash_names = {entry["name"] for entry in historical_cash}
 
     first_date = datetime.strptime(historical_cash[0]["date"], "%Y-%m-%d").date()
     
@@ -261,41 +268,49 @@ def populateDailyCash(until_date: datetime, historical_cash: list, first_transac
         first_date = datetime.strptime(first_transaction_date, "%Y-%m-%d").date()
 
     last_date = until_date.date()
-    populated_cash = []
-    last_known_value = 0
-    last_known_interest_rate = 0.0  # Default interest rate if none is provided
     
-    historical_cash_idx = 0
-
-    current_date = first_date
-    while current_date <= last_date:
-        date_str = current_date.strftime("%Y-%m-%d")
+    populated_cash = {ticker: [] for ticker in cash_names}
+    
+    for cash_name in cash_names:
+    
+        last_known_value = 0
+        last_known_interest_rate = 0.0  # Default interest rate if none is provided
         
-        daily_interest_rate = last_known_interest_rate / 100 / 365
+        historical_cash_idx = 0
 
-        if current_date != first_date:
-            last_known_value += last_known_value * daily_interest_rate
-            
-        if date_str in historical_cash_dict:
-            last_known_value = historical_cash[historical_cash_idx]["value"]
-            last_known_interest_rate = historical_cash[historical_cash_idx]["interest"]
-            historical_cash_idx += 1
-            
-        value = historical_cash_dict.get(date_str, last_known_value)
+        current_date = first_date
+        while current_date <= last_date:
+            date_str = current_date.strftime("%Y-%m-%d")
+            key = (cash_name, date_str)
 
-        populated_cash.append({
-            "name": "Cash",
-            "value": value,
-            "interest" : last_known_interest_rate,
-            "date": date_str
-        })
+            daily_interest_rate = last_known_interest_rate / 100 / 365
 
-        if date_str in historical_cash_dict:
-            last_known_value = historical_cash_dict[date_str]
+            if current_date != first_date:
+                last_known_value += last_known_value * daily_interest_rate
+                
+            if key in historical_cash_dict:
+                last_known_value = historical_cash[historical_cash_idx]["value"]
+                last_known_interest_rate = historical_cash[historical_cash_idx]["interest"]
+                historical_cash_idx += 1
+                
+            value = historical_cash_dict.get(date_str, last_known_value)
 
-        current_date += timedelta(days=1)
+            populated_cash[cash_name].append({
+                "name": cash_name,
+                "value": value,
+                "interest" : last_known_interest_rate,
+                "date": date_str
+            })
 
-    return populated_cash
+            if date_str in historical_cash_dict:
+                last_known_value = historical_cash_dict[date_str]
+
+            current_date += timedelta(days=1)
+    result = []
+    for records in populated_cash.values():
+        result.extend(records)
+
+    return result
 
 def getDailyValueRealEstate(real_estate_transactions:list[tuple], until_date) -> dict:
     

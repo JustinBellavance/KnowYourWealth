@@ -1,137 +1,141 @@
 <template>
-    <div class="min-h-screen bg-gradient-to-b from-blue-50 to-white flex flex-col items-center">
-      <!-- Header -->
-      <header class="w-full bg-blue-500 text-white py-4 px-8">
-        <div class="max-w-7xl mx-auto flex justify-between items-center">
-          <h1 class="text-2xl font-bold">NetWorthTrack</h1>
-          <button
-            @click="navigateToSignup"
-            class="bg-white text-blue-500 px-6 py-2 rounded-lg shadow-md hover:bg-blue-100"
-          >
-            Sign Up Free
-          </button>
+  <div class="landing-page">
+    <Header></Header>
+    <main class="hero-section">
+      <div class="hero-content">
+        <div class="text">
+          <h1>
+            <span class="word1">Track</span>
+            <span class="word2">your</span>
+            <span class="word3">growing</span>
+            <span class="highlight">Wealth</span>
+          </h1>
+          <p>An all-encompassing net worth tracker made by Canadians, for Canadians.</p>
         </div>
-      </header>
-  
-      <!-- Hero Section -->
-      <section class="flex flex-col md:flex-row items-center justify-between max-w-7xl mx-auto py-16 px-8 gap-8">
-        <div class="flex-1">
-          <h2 class="text-4xl font-bold text-blue-700 mb-6">
-            Take Charge of Your <span class="text-green-500">Net Worth</span>
-          </h2>
-          <p class="text-gray-600 mb-8 text-lg">
-            Track your <span class="font-bold">cash</span>, 
-            <span class="font-bold">stocks</span>, 
-            <span class="font-bold">debt</span>, and 
-            <span class="font-bold">real estate</span> effortlessly. 
-            See your progress and stay motivated to achieve financial freedom!
-          </p>
-          <button
-            @click="navigateToSignup"
-            class="bg-blue-500 text-white text-lg px-8 py-3 rounded-lg shadow-lg hover:bg-blue-600"
-          >
-            Sign Up for Free
-          </button>
-        </div>
-        <div class="flex-1">
-          <img
-            src="https://via.placeholder.com/500x350"
-            alt="Net worth tracking illustration"
-            class="rounded-lg shadow-lg"
-          />
-        </div>
-      </section>
-  
-      <!-- Features Section -->
-      <section class="w-full bg-blue-100 py-16">
-        <div class="max-w-7xl mx-auto px-8">
-          <h3 class="text-3xl font-bold text-blue-700 mb-12 text-center">
-            Why Choose NetWorthTrack?
-          </h3>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            <div class="text-center p-6 bg-white rounded-lg shadow-md" v-for="feature in features" :key="feature.title">
-              <img
-                :src="feature.icon"
-                :alt="feature.title"
-                class="mx-auto mb-4"
-              />
-              <h4 class="text-xl font-bold text-blue-600">{{ feature.title }}</h4>
-              <p class="text-gray-600">{{ feature.description }}</p>
-            </div>
-          </div>
-        </div>
-      </section>
-  
-      <!-- Call to Action -->
-      <section class="w-full py-16 px-8">
-        <div class="max-w-7xl mx-auto text-center">
-          <h3 class="text-3xl font-bold text-blue-700 mb-6">
-            Ready to Track Your Net Worth?
-          </h3>
-          <p class="text-gray-600 text-lg mb-8">
-            Sign up today for free and start making progress toward your financial goals!
-          </p>
-          <button
-            @click="navigateToSignup"
-            class="bg-green-500 text-white text-lg px-8 py-3 rounded-lg shadow-lg hover:bg-green-600"
-          >
-            Create Your Free Account
-          </button>
-        </div>
-      </section>
-    </div>
-  </template>
-  
-  <script lang="ts">
-  import { defineComponent, reactive } from "vue";
-  
-  interface Feature {
-    title: string;
-    description: string;
-    icon: string;
-  }
-  
-  export default defineComponent({
-    name: "LandingPage",
-    setup() {
-      // Reactive state for features
-      const features = reactive<Feature[]>([
-        {
-          title: "Cash Tracking",
-          description: "Know exactly how much cash you have and where it’s stored.",
-          icon: "https://via.placeholder.com/100",
-        },
-        {
-          title: "Stock Portfolio",
-          description: "Monitor your stock holdings and market value in real-time.",
-          icon: "https://via.placeholder.com/100",
-        },
-        {
-          title: "Debt Management",
-          description: "Track and pay down your debt with ease and confidence.",
-          icon: "https://via.placeholder.com/100",
-        },
-        {
-          title: "Real Estate",
-          description: "Keep tabs on your real estate assets and their current worth.",
-          icon: "https://via.placeholder.com/100",
-        },
-      ]);
-  
-      // Method to navigate to the signup page
-      const navigateToSignup = () => {
-        window.location.href = "/signup"; // Update this for router-based navigation if used
-      };
-  
-      return {
-        features,
-        navigateToSignup,
-      };
-    },
-  });
-  </script>
-  
-  <style scoped>
-  /* Add any scoped styles if needed */
-  </style>
-  
+        <button class="waitlist-button">Join the waitlist</button>
+      </div>
+      <div class="background">
+        <!-- <img src="/path/to/clouds.png" alt="Cloud Background" /> -->
+      </div>
+    </main>
+  </div>
+</template>
+
+<script setup lang="ts">
+import Header from "@/components/HeaderHome.vue"
+</script>
+
+<style scoped>
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Roboto:wght@400;500;700&display=swap');
+
+.landing-page {
+  font-family: 'Roboto', sans-serif; /* Default font for the rest of the page */
+  color: #333;
+  text-align: center;
+  font-size: 2rem;
+  margin-top:10px;
+}
+
+.hero-section {
+  height: 90vh; /* Full height of the viewport */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  position: relative;
+}
+
+.hero-content {
+  max-width: 650px;
+  margin: 0 auto;
+}
+
+.text {
+  margin-bottom: 20px;
+}
+
+h1 {
+  font-family: 'Playfair Display', serif; /* Apply Playfair Display to h1 */
+  font-size: 3rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+  line-height: 1.2; /* Ensures the lines are not too far apart */
+  white-space: nowrap; /* Prevent line breaks */
+}
+
+.word1 {
+  font-size: 2.5rem; /* Smaller size for 'Track' */
+  margin-right: 10px;
+}
+
+.word2 {
+  font-size: 3rem; /* Medium size for 'your' */
+  margin-right: 10px;
+}
+
+.word3 {
+  font-size: 3.5rem; /* Larger size for 'growing' */
+  margin-right: 2px;
+}
+
+.highlight {
+  font-style: italic;
+  font-size: 4rem; /* Largest size for 'Wealth' */
+}
+
+/* Enhanced Waitlist Button Styling */
+.waitlist-button {
+  background-color: #000; /* Black background */
+  color: #fff; /* White text */
+  font-size: 1.2rem;
+  padding: 12px 30px;
+  border: 2px solid #fff; /* White border */
+  border-radius: 30px; /* Rounded corners */
+  cursor: pointer;
+  transition: all 0.3s ease; /* Smooth transition for hover effects */
+  font-weight: 600;
+  text-transform: uppercase; /* Uppercase text for a modern look */
+  letter-spacing: 1px; /* Slight letter spacing for clarity */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+}
+
+.waitlist-button:hover {
+  background-color: #fff; /* White background on hover */
+  color: #000; /* Black text on hover */
+  transform: translateY(-2px); /* Slight lift effect on hover */
+}
+
+.waitlist-button:focus {
+  outline: none; /* Remove default focus outline */
+}
+
+.waitlist-button:active {
+  transform: translateY(0); /* Return to normal position when clicked */
+}
+
+.background img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: auto;
+  z-index: -1;
+}
+
+.portfolio {
+  padding: 50px 20px;
+  background-color: #f4f4f4;
+}
+
+.portfolio .companies {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.portfolio .companies img {
+  height: 60px;
+}
+</style>

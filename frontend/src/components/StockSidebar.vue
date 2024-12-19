@@ -24,19 +24,21 @@
     top: 0;
     left: 0;
     height: 100%;
-    padding: 20px;
-    background-color: #2c3e50;
+    padding: 10px;
+    background-color: white;
     color: white;
     display: flex;
     flex-direction: column;
     gap: 20px;
-    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
   }
   
   .form-container {
-    padding: 20px;
-    background-color: #34495e;
+    padding: 10px;
+    background-color: white;
+    border-color : black;
+    border-width: 2px;
     border-radius: 5px;
+    margin-left : 10px;
   }
   
   .fade-enter-active, .fade-leave-active {

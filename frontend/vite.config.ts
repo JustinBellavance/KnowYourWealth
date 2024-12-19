@@ -15,6 +15,9 @@ export default defineConfig({
     },
   },
   server: {
-    port: process.env.PORT || 5000
-  }
+    port: process.env.PORT || 5000,
+  },
+  build:{
+    outDir: 'dist',
+  },
 })

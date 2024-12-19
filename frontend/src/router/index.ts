@@ -1,11 +1,11 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router";
 import LandingPage from "@/views/LandingPage.vue";
-import SignupPage from "@/views/SignUpPage.vue";
+import SignupPage from "@/views/SignupPage.vue";
 import PortfolioPage from "@/views/PortfolioPage.vue"
 
 const routes: RouteRecordRaw[] = [
   { path: "/", component: LandingPage },
-  { path: "/signup", component: SignUpPage },
+  { path: "/signup", component: SignupPage },
   { path: "/portfolio/:id", component: PortfolioPage}
 ];
 

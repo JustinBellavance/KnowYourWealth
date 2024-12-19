@@ -24,7 +24,10 @@
   
         <section class="portfolio-overview p-1 m-3">
           <div class="overview-grid mt-4 mx-0 px-0">
-            <AssetCard v-for="(asset, index) in overviewData" :key="index" :asset="asset" />
+            <StockCard v-for="(asset, index) in overviewStockData" :key="index" :asset="asset" />
+          </div>
+          <div class="overview-grid mt-4 mx-0 px-0">
+            <AssetCard v-for="(asset, index) in overviewAssetData" :key="index" :asset="asset" />
           </div>
         </section>
   
@@ -45,6 +48,7 @@
   import WorthGraph from "@/components/WorthGraph.vue"
   import TabButton from "@/components/TabButton.vue"
   import AssetCard from "@/components/AssetCard.vue"
+  import StockCard from "@/components/StockCard.vue"
 
   import { ref, computed, onMounted } from 'vue';
   import { useRoute } from 'vue-router';
@@ -114,7 +118,7 @@
   );
 
   const cashTotal = computed(() =>
-      cash.value.length > 0 ? cash.value[cash.value.length - 1].value : 0
+    cashDetails.value.reduce((sum, item) => sum + item.value, 0)
   );
   
   const totalNetWorth = computed(() => stocksTotal.value + cashTotal.value);
@@ -155,11 +159,51 @@
     return latestStockPerName;
   });
 
+  
+  const cashDetails = computed(() => {
+    // Group the cashs by their name
+    const groupedByCashName: Record<string, any[]> = {};
+
+    // Step 1: Group by cash name
+    cash.value.forEach((cash) => {
+      if (!groupedByCashName[cash.name]) {
+        groupedByCashName[cash.name] = [];
+      }
+      groupedByCashName[cash.name].push(cash);
+    });
+
+    // Step 2: For each cash, find the entry with the latest date
+    const latestCashPerName = Object.keys(groupedByCashName).map((name) => {
+      // Get all the cashs for this name and sort them by date
+      const cashForName = groupedByCashName[name];
+
+      // Sort by date in descending order to get the latest date first
+      cashForName.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      // Return the stock with the most recent date
+
+      console.log(cashForName[0].quantity * cashForName[0].price);
+      console.log(cashForName[0].quantity, cashForName[0].price);
+
+      return {
+        name,
+        interest : cashForName[0].interest,
+        value: cashForName[0].value
+      };
+    });
+
+    return latestCashPerName;
+  });
+
 
   // Overview data for rendering
-  const overviewData = computed(() => [
+  const overviewStockData = computed(() => [
     { title: "Stocks", value: stocksTotal.value, details : stockDetails.value},
-    { title: "Cash", value: cashTotal.value },
+  ])
+
+  // this is for when we add more assets
+  const overviewAssetData = computed(() => [
+    { title: "Cash", value: cashTotal.value, details : cashDetails.value },
   ]);
 
   const fetchStocks = async () => {
